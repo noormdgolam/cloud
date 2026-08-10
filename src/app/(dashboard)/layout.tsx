@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Sidebar } from "@/components/dashboard/Sidebar";
+import { Sidebar, MobileNav } from "@/components/dashboard/Sidebar";
 
 export default async function DashboardLayout({ children }: LayoutProps<"/">) {
   const session = await auth();
@@ -19,8 +19,14 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-7xl gap-4 px-4 py-4 sm:px-6">
+    <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 md:flex-row">
       <Sidebar
+        userName={user.name}
+        userEmail={user.email}
+        usedBytes={user.usedBytes}
+        quotaBytes={user.quotaBytes}
+      />
+      <MobileNav
         userName={user.name}
         userEmail={user.email}
         usedBytes={user.usedBytes}
