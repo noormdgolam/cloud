@@ -22,6 +22,11 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      # LayoutProps/PageProps/RouteContext are ambient types Next.js writes
+      # to .next/types/ — without this, tsc fails with "Cannot find name".
+      - name: Generate Next.js route types
+        run: npx next typegen
+
       - name: Type-check
         run: npx tsc --noEmit -p tsconfig.json
 
