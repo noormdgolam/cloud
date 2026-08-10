@@ -28,8 +28,22 @@ function requireEnv(name: string): string {
 
 // Reuse a single client across hot reloads in dev and across route handler
 // invocations in production, instead of opening a new connection pool per request.
-export const prisma = globalThis.__prisma ?? createClient();
-
-if (process.env.NODE_ENV !== "production") {
-  globalThis.__prisma = prisma;
+function getClient(): PrismaClient {
+  if (!globalThis.__prisma) {
+    globalThis.__prisma = createClient();
+  }
+  return globalThis.__prisma;
 }
+
+// Lazy on purpose: `next build` imports route modules to collect their
+// config (dynamic/runtime exports) without ever calling the handlers, so
+// constructing the real client (which requires DB_* env vars) at module
+// scope would crash the build itself. Only the first actual property
+// access — which only happens inside a request — creates the client.
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop, _receiver) {
+    const client = getClient();
+    const value = Reflect.get(client as object, prop, client);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
