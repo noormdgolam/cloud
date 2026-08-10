@@ -54,3 +54,6 @@ jobs:
           name: deploy-bundle
           path: deploy/
           retention-days: 14
+          # upload-artifact excludes dotfiles/dotdirs by default — .next/ is
+          # dot-prefixed and was silently missing from the zip without this.
+          include-hidden-files: true
