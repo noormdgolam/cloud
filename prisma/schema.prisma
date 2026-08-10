@@ -1,0 +1,183 @@
+// Prisma schema for cloud.bongshai.com
+// Prisma ORM 7 — uses the "prisma-client" generator + a driver adapter
+// (@prisma/adapter-mariadb) rather than the old bundled query-engine binary.
+// The database connection URL lives in prisma.config.ts / DATABASE_URL, not here.
+//
+// ID/FK columns are explicitly @db.VarChar(N) (tight lengths matching cuid()'s
+// actual 25-char output, not Prisma's 191-char MySQL default) because this
+// host's MySQL/MariaDB caps composite index key length at ~1000 bytes — a
+// couple of default-width VARCHAR(191) utf8mb4 columns in the same index blows
+// past that immediately. Every field below sized to keep every index safely
+// under that ceiling.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model User {
+  id            String    @id @default(cuid()) @db.VarChar(30)
+  email         String    @unique @db.VarChar(191)
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  passwordHash  String? // null for OAuth-only accounts
+
+  usedBytes  BigInt  @default(0)
+  quotaBytes BigInt? @default(26843545600) // 25 GiB; null = unlimited (superuser, granted manually)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts    Account[]
+  sessions    Session[]
+  files       File[]
+  folders     Folder[]
+  shareLinks  ShareLink[]
+  claimedFrom AnonymousSession[]
+}
+
+// Auth.js Prisma-adapter shape — field names must not deviate.
+model Account {
+  id                String  @id @default(cuid()) @db.VarChar(30)
+  userId            String  @db.VarChar(30)
+  type              String
+  provider          String  @db.VarChar(50)
+  providerAccountId String  @db.VarChar(100)
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid()) @db.VarChar(30)
+  sessionToken String   @unique @db.VarChar(64)
+  userId       String   @db.VarChar(30)
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String   @db.VarChar(100)
+  token      String   @unique @db.VarChar(100)
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model AnonymousSession {
+  id         String   @id @db.VarChar(48) // the raw random cookie value, not a cuid
+  usedBytes  BigInt   @default(0)
+  quotaBytes BigInt   @default(2147483648) // 2 GiB
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @updatedAt
+
+  claimedByUserId String? @db.VarChar(30)
+  claimedByUser   User?   @relation(fields: [claimedByUserId], references: [id], onDelete: SetNull)
+
+  files      File[]
+  folders    Folder[]
+  shareLinks ShareLink[]
+
+  @@index([claimedByUserId])
+}
+
+model Folder {
+  id       String  @id @default(cuid()) @db.VarChar(30)
+  name     String
+  parentId String? @db.VarChar(30)
+
+  parent   Folder?  @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children Folder[] @relation("FolderTree")
+
+  userId String? @db.VarChar(30)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  anonymousSessionId String?           @db.VarChar(48)
+  anonymousSession   AnonymousSession? @relation(fields: [anonymousSessionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  files File[]
+
+  @@index([userId])
+  @@index([anonymousSessionId])
+  @@index([parentId])
+}
+
+enum FileStatus {
+  RESERVED
+  COMMITTED
+  DELETED
+}
+
+model File {
+  id             String     @id @default(cuid()) @db.VarChar(30)
+  storageKey     String     @unique @db.VarChar(36) // UUID used verbatim as the on-disk filename, no extension
+  originalName   String
+  mimeType       String
+  size           BigInt // reconciled to real byte count post-upload
+  status         FileStatus @default(RESERVED)
+  checksumSha256 String?
+
+  folderId String? @db.VarChar(30)
+  folder   Folder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
+  userId String? @db.VarChar(30)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  anonymousSessionId String?           @db.VarChar(48)
+  anonymousSession   AnonymousSession? @relation(fields: [anonymousSessionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  shareLinks ShareLink[]
+
+  @@index([userId, folderId, createdAt])
+  @@index([anonymousSessionId, folderId, createdAt])
+}
+
+model ShareLink {
+  id    String @id @default(cuid()) @db.VarChar(30)
+  token String @unique @db.VarChar(32) // crypto.randomBytes(18).toString('base64url')
+
+  fileId String @db.VarChar(30)
+  file   File   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  expiresAt     DateTime?
+  maxDownloads  Int?
+  downloadCount Int       @default(0)
+  revoked       Boolean   @default(false)
+
+  createdByUserId String? @db.VarChar(30)
+  createdByUser   User?   @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  createdByAnonId String?           @db.VarChar(48)
+  createdByAnon   AnonymousSession? @relation(fields: [createdByAnonId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([fileId])
+}
+
+model RateLimitBucket {
+  key         String   @id @db.VarChar(191) // `${ip}:${route}`
+  count       Int      @default(0)
+  windowStart DateTime @default(now())
+}

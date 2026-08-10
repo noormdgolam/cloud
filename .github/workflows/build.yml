@@ -1,0 +1,51 @@
+name: Build deploy bundle
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Type-check
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build (Next.js standalone output)
+        run: npm run build
+
+      # output: 'standalone' does NOT copy public/ or .next/static/ into the
+      # standalone folder by design — assemble the real deploy bundle here.
+      - name: Assemble deploy bundle
+        run: |
+          mkdir -p deploy
+          cp -r .next/standalone/. deploy/
+          mkdir -p deploy/.next/static
+          cp -r .next/static/. deploy/.next/static/
+          cp -r public deploy/public
+          echo "Deploy bundle contents:"
+          find deploy -maxdepth 2
+
+      - name: Upload deploy bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-bundle
+          path: deploy/
+          retention-days: 14

@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+/*
+ * cloud.bongshai.com — dark-only design system.
+ * No light theme: this is a deliberate choice for the product, not an
+ * omission, so tokens are plain values rather than light/dark pairs.
+ */
+:root {
+  --bg-0: #05060a;
+  --bg-1: #0a0c12;
+  --bg-2: #10131b;
+  --bg-3: #161a24;
+
+  --border: rgba(237, 240, 247, 0.08);
+  --border-strong: rgba(237, 240, 247, 0.16);
+
+  --ink: #edeff3;
+  --ink-muted: #8b93a7;
+  --ink-faint: #565e6f;
+
+  --accent: #7c5cff;
+  --accent-2: #22d3ee;
+  --accent-ink: #05060a;
+
+  --success: #35d28a;
+  --warning: #f5a623;
+  --danger: #ff5c72;
+
+  --glass-surface: rgba(237, 240, 247, 0.045);
+  --glass-surface-hover: rgba(237, 240, 247, 0.075);
+  --glass-highlight: rgba(237, 240, 247, 0.14);
+}
+
+@theme inline {
+  --color-bg-0: var(--bg-0);
+  --color-bg-1: var(--bg-1);
+  --color-bg-2: var(--bg-2);
+  --color-bg-3: var(--bg-3);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-accent-ink: var(--accent-ink);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg-1);
+  color: var(--ink);
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* Glass surface primitive — used by GlassCard and friends via className="glass" */
+.glass {
+  background: var(--glass-surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-highlight),
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 24px 48px -24px rgba(0, 0, 0, 0.6);
+}
+
+.glow-accent {
+  background: radial-gradient(
+    60% 60% at 50% 0%,
+    color-mix(in srgb, var(--accent) 22%, transparent) 0%,
+    transparent 70%
+  );
+}
+
+/* Faint grid backdrop for the marketing hero — kept CSS-only (no canvas/video) */
+.grid-fade {
+  background-image:
+    linear-gradient(to right, rgba(237, 240, 247, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(237, 240, 247, 0.05) 1px, transparent 1px);
+  background-size: 64px 64px;
+  -webkit-mask-image: radial-gradient(ellipse 60% 50% at 50% 0%, black 40%, transparent 100%);
+  mask-image: radial-gradient(ellipse 60% 50% at 50% 0%, black 40%, transparent 100%);
+}
