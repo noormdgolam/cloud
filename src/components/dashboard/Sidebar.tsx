@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Cloud, FolderOpen, LogOut, Menu } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Cloud, FolderOpen, LogOut, Menu, Settings } from "lucide-react";
+import { cn } from "@/lib/cn";
 import { signOutAction } from "@/lib/actions/auth-actions";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/Dialog";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { StorageMeter } from "./StorageMeter";
 
 type SidebarProps = {
@@ -33,6 +36,8 @@ function SidebarBody({
   onNavigate,
 }: SidebarProps & { onNavigate?: () => void }) {
   const initial = (userName ?? userEmail).charAt(0).toUpperCase();
+  const pathname = usePathname();
+  const onSettings = pathname === "/settings";
 
   return (
     <>
@@ -40,10 +45,24 @@ function SidebarBody({
         <Link
           href="/dashboard"
           onClick={onNavigate}
-          className="flex items-center gap-2.5 rounded-xl bg-[var(--glass-surface)] px-3 py-2.5 text-sm font-medium text-ink"
+          className={cn(
+            "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-ink",
+            !onSettings && "bg-[var(--glass-surface)]"
+          )}
         >
           <FolderOpen className="size-4 text-accent" strokeWidth={1.75} aria-hidden />
           My files
+        </Link>
+        <Link
+          href="/settings"
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-ink",
+            onSettings && "bg-[var(--glass-surface)]"
+          )}
+        >
+          <Settings className="size-4 text-ink-muted" strokeWidth={1.75} aria-hidden />
+          Settings
         </Link>
       </nav>
 
@@ -58,6 +77,7 @@ function SidebarBody({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm text-ink">{userName ?? userEmail}</p>
         </div>
+        <ThemeToggle />
         <form action={signOutAction}>
           <button
             type="submit"
