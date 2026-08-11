@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Folder as FolderIcon, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Folder as FolderIcon, FolderInput, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { deleteFolder, renameFolder } from "@/lib/actions/folder-actions";
 import {
   DropdownMenu,
@@ -13,10 +13,20 @@ import {
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { MoveFolderDialog } from "./MoveFolderDialog";
 
-export function FolderCard({ id, name }: { id: string; name: string }) {
+export function FolderCard({
+  id,
+  name,
+  parentId = null,
+}: {
+  id: string;
+  name: string;
+  parentId?: string | null;
+}) {
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
   const renameAction = renameFolder.bind(null, id);
 
   return (
@@ -42,12 +52,18 @@ export function FolderCard({ id, name }: { id: string; name: string }) {
             <Pencil className="size-3.5" aria-hidden />
             Rename
           </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setMoveOpen(true)}>
+            <FolderInput className="size-3.5" aria-hidden />
+            Move to...
+          </DropdownMenuItem>
           <DropdownMenuItem destructive onSelect={() => setDeleteOpen(true)}>
             <Trash2 className="size-3.5" aria-hidden />
             Delete
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <MoveFolderDialog folderId={id} currentParentId={parentId} open={moveOpen} onOpenChange={setMoveOpen} />
 
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
         <DialogContent title="Rename folder">

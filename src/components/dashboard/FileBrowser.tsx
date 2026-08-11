@@ -1,9 +1,10 @@
 import { FolderOpen } from "lucide-react";
-import type { BreadcrumbEntry } from "@/lib/data/browser";
+import type { BreadcrumbEntry, SortOption } from "@/lib/data/browser";
 import { Breadcrumb } from "./Breadcrumb";
 import { FolderCard } from "./FolderCard";
 import { FileRow } from "./FileRow";
 import { NewFolderDialog } from "./NewFolderDialog";
+import { SortSelect } from "./SortSelect";
 import { UploadZone } from "./UploadZone";
 
 type FolderSummary = { id: string; name: string };
@@ -20,19 +21,27 @@ export function FileBrowser({
   breadcrumbs,
   folders,
   files,
+  sort,
 }: {
   parentId: string | null;
   breadcrumbs: BreadcrumbEntry[];
   folders: FolderSummary[];
   files: FileSummary[];
+  sort: SortOption;
 }) {
   const isEmpty = folders.length === 0 && files.length === 0;
+  const basePath = parentId ? `/folder/${parentId}` : "/dashboard";
 
   return (
     <UploadZone
       folderId={parentId}
       headerLeft={<Breadcrumb entries={breadcrumbs} />}
-      toolbarExtra={<NewFolderDialog parentId={parentId} />}
+      toolbarExtra={
+        <>
+          {files.length > 1 && <SortSelect basePath={basePath} sort={sort} />}
+          <NewFolderDialog parentId={parentId} />
+        </>
+      }
     >
       {isEmpty ? (
         <div className="glass flex flex-col items-center gap-3 rounded-2xl px-6 py-20 text-center">
@@ -48,7 +57,7 @@ export function FileBrowser({
           {folders.length > 0 && (
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
               {folders.map((folder) => (
-                <FolderCard key={folder.id} id={folder.id} name={folder.name} />
+                <FolderCard key={folder.id} id={folder.id} name={folder.name} parentId={parentId} />
               ))}
             </div>
           )}
