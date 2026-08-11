@@ -1,6 +1,18 @@
 {
   "version": 1,
   "skills": {
+    "caveman": {
+      "source": "juliusbrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman/SKILL.md",
+      "computedHash": "42d72b7f2a23f9732cbaa6d5a76a5c8fd240f0114be4a7347109cd413fcccd82"
+    },
+    "nodejs-development": {
+      "source": "manutej/luxor-claude-marketplace",
+      "sourceType": "github",
+      "skillPath": "plugins/luxor-backend-toolkit/skills/nodejs-development/SKILL.md",
+      "computedHash": "8ec957bf11febce2d9382ac31e84c34f74e374482c7bb2601c267b85fb7d7a05"
+    },
     "prisma-cli": {
       "source": "prisma/skills",
       "sourceType": "github",
