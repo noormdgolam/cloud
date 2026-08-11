@@ -30,6 +30,8 @@ model User {
   usedBytes  BigInt  @default(0)
   quotaBytes BigInt? @default(26843545600) // 25 GiB; null = unlimited (superuser, granted manually)
 
+  isAdmin Boolean @default(false) // grants access to /backstage — granted manually, never self-service
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

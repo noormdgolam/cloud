@@ -11,6 +11,8 @@
     "db:push": "prisma db push && tsx scripts/ensure-innodb.ts && prisma db push",
     "db:studio": "prisma studio",
     "grant-unlimited": "tsx scripts/grant-unlimited.ts",
+    "grant-admin": "tsx scripts/grant-admin.ts",
+    "create-account": "tsx scripts/create-account.ts",
     "cleanup-anonymous": "tsx scripts/cleanup-anonymous-files.ts",
     "diagnose": "node scripts/diagnose.mjs"
   },
