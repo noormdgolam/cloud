@@ -8,6 +8,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { toggleUnlimited, toggleAdmin, adminDeleteFile } from "@/lib/actions/admin-actions";
+import { AdminResetPasswordForm } from "@/components/backstage/AdminResetPasswordForm";
 
 export const metadata = { title: "Backstage — User" };
 
@@ -70,6 +71,18 @@ export default async function BackstageUserDetail({
           </div>
         </div>
       </GlassCard>
+
+      {user.passwordHash && (
+        <GlassCard className="p-5">
+          <h2 className="text-sm font-semibold text-ink">Set a new password</h2>
+          <p className="mt-1 text-xs text-ink-faint">
+            Stopgap for locked-out users until there&apos;s a self-service email reset flow.
+          </p>
+          <div className="mt-3">
+            <AdminResetPasswordForm userId={user.id} />
+          </div>
+        </GlassCard>
+      )}
 
       <GlassCard className="p-0">
         <div className="border-b border-border p-4">

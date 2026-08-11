@@ -1,11 +1,31 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import bcrypt from "bcryptjs";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { deleteStoredFile } from "@/lib/storage";
+import { adminResetPasswordSchema } from "@/lib/validators";
+import type { FormState } from "./auth-actions";
 
 const DEFAULT_QUOTA_BYTES = BigInt(26843545600); // 25 GiB
+
+// Stopgap for locked-out users until there's a self-service email-based
+// reset flow (needs an email-sending service to be wired up first).
+export async function adminResetPassword(userId: string, _prevState: FormState, formData: FormData): Promise<FormState> {
+  await requireAdmin();
+  const parsed = adminResetPasswordSchema.safeParse({ newPassword: formData.get("newPassword") });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Check the password and try again." };
+  }
+
+  const target = await prisma.user.findUnique({ where: { id: userId }, select: { passwordHash: true } });
+  if (!target) return { error: "User not found." };
+
+  const passwordHash = await bcrypt.hash(parsed.data.newPassword, 12);
+  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  revalidatePath(`/backstage/users/${userId}`);
+}
 
 export async function toggleUnlimited(userId: string, unlimited: boolean) {
   await requireAdmin();
