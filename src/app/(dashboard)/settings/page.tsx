@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { ProfileForm } from "@/components/dashboard/ProfileForm";
 import { PasswordForm } from "@/components/dashboard/PasswordForm";
+import { DeleteAccountDialog } from "@/components/dashboard/DeleteAccountDialog";
 
 export const metadata = { title: "Settings" };
 
@@ -43,6 +44,16 @@ export default async function SettingsPage() {
             This account signs in with Google or GitHub — there&apos;s no password to manage.
           </p>
         )}
+      </GlassCard>
+
+      <GlassCard className="border-danger/30 p-5">
+        <h2 className="text-sm font-semibold text-danger">Danger zone</h2>
+        <p className="mt-1 text-sm text-ink-muted">
+          Permanently delete your account and every file you&apos;ve uploaded. This can&apos;t be undone.
+        </p>
+        <div className="mt-4">
+          <DeleteAccountDialog email={user.email} />
+        </div>
       </GlassCard>
     </div>
   );

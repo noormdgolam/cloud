@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
-import { auth } from "@/lib/auth";
+import { auth, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { profileSchema, passwordChangeSchema } from "@/lib/validators";
+import { deleteStoredFile } from "@/lib/storage";
 import type { FormState } from "./auth-actions";
 
 async function requireUserId() {
@@ -48,4 +50,31 @@ export async function changePassword(_prevState: FormState, formData: FormData):
 
   const passwordHash = await bcrypt.hash(parsed.data.newPassword, 12);
   await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+}
+
+export async function deleteAccount(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const userId = await requireUserId();
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+
+  if (formData.get("confirmEmail") !== user.email) {
+    return { error: "Type your email exactly to confirm." };
+  }
+
+  const files = await prisma.file.findMany({ where: { userId }, select: { storageKey: true } });
+
+  // User row cascades to Account/Session/Folder/File/ShareLink via the
+  // schema's onDelete rules — this only needs to also clean up the actual
+  // disk blobs, which the DB has no knowledge of.
+  await prisma.user.delete({ where: { id: userId } });
+
+  await Promise.all(
+    files.map((file) =>
+      deleteStoredFile(file.storageKey).catch((error) => {
+        console.error("Account deletion: failed to remove stored file from disk:", file.storageKey, error);
+      })
+    )
+  );
+
+  await signOut({ redirect: false });
+  redirect("/");
 }
