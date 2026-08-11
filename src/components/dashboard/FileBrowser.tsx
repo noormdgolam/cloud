@@ -63,6 +63,7 @@ export function FileBrowser({
                   size={file.size}
                   mimeType={file.mimeType}
                   createdAt={file.createdAt}
+                  folderId={parentId}
                 />
               ))}
             </div>

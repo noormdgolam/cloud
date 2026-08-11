@@ -44,6 +44,34 @@ export async function renameFile(fileId: string, formData: FormData) {
   revalidatePath("/upload");
 }
 
+export async function listUserFolders(): Promise<{ id: string; name: string; parentId: string | null }[]> {
+  const identity = await requireIdentity();
+  if (!("userId" in identity)) return []; // anonymous visitors have no folders
+
+  return prisma.folder.findMany({
+    where: { userId: identity.userId },
+    select: { id: true, name: true, parentId: true },
+    orderBy: { name: "asc" },
+  });
+}
+
+export async function moveFile(fileId: string, targetFolderId: string | null) {
+  const identity = await requireIdentity();
+
+  const file = await prisma.file.findUnique({ where: { id: fileId } });
+  if (!file || !ownsFile(file, identity)) throw new Error("Not found.");
+
+  if (targetFolderId) {
+    const folder = await prisma.folder.findUnique({ where: { id: targetFolderId } });
+    if (!folder || !ownsFile(folder, identity)) throw new Error("Folder not found.");
+  }
+
+  await prisma.file.update({ where: { id: fileId }, data: { folderId: targetFolderId } });
+
+  revalidatePath(file.folderId ? `/folder/${file.folderId}` : "/dashboard");
+  revalidatePath(targetFolderId ? `/folder/${targetFolderId}` : "/dashboard");
+}
+
 export async function deleteFile(fileId: string) {
   const identity = await requireIdentity();
 
