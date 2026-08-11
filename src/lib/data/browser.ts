@@ -31,7 +31,15 @@ export async function searchFiles(userId: string, query: string): Promise<Search
   }));
 }
 
-export async function getFolderContents(userId: string, folderId: string | null) {
+export type SortOption = "date" | "name" | "size";
+
+const FILE_ORDER_BY: Record<SortOption, { createdAt: "desc" } | { originalName: "asc" } | { size: "desc" }> = {
+  date: { createdAt: "desc" },
+  name: { originalName: "asc" },
+  size: { size: "desc" },
+};
+
+export async function getFolderContents(userId: string, folderId: string | null, sort: SortOption = "date") {
   let breadcrumbs: BreadcrumbEntry[] = [];
 
   if (folderId) {
@@ -61,7 +69,7 @@ export async function getFolderContents(userId: string, folderId: string | null)
     }),
     prisma.file.findMany({
       where: { userId, folderId, status: "COMMITTED" },
-      orderBy: { createdAt: "desc" },
+      orderBy: FILE_ORDER_BY[sort],
     }),
   ]);
 

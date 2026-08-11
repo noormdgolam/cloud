@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { getFolderContents, searchFiles } from "@/lib/data/browser";
+import { getFolderContents, searchFiles, type SortOption } from "@/lib/data/browser";
 import { hasClaimableFiles } from "@/lib/actions/claim-actions";
 import { FileBrowser } from "@/components/dashboard/FileBrowser";
 import { ClaimBanner } from "@/components/dashboard/ClaimBanner";
@@ -12,13 +12,13 @@ export const metadata: Metadata = { title: "My files" };
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; sort?: string }>;
 }) {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) redirect("/login");
 
-  const { q } = await searchParams;
+  const { q, sort } = await searchParams;
   const query = q?.trim();
 
   if (query) {
@@ -26,8 +26,10 @@ export default async function DashboardPage({
     return <SearchResults query={query} results={results} />;
   }
 
+  const sortOption: SortOption = sort === "name" || sort === "size" ? sort : "date";
+
   const [contents, claimable] = await Promise.all([
-    getFolderContents(userId, null),
+    getFolderContents(userId, null, sortOption),
     hasClaimableFiles(),
   ]);
   if (!contents) redirect("/dashboard");
@@ -40,6 +42,7 @@ export default async function DashboardPage({
         breadcrumbs={contents.breadcrumbs}
         folders={contents.folders}
         files={contents.files}
+        sort={sortOption}
       />
     </>
   );
