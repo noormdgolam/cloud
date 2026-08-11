@@ -1,4 +1,4 @@
-import { Readable } from "node:stream";
+import { PassThrough, Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { createHash } from "node:crypto";
 import busboy from "busboy";
@@ -22,50 +22,6 @@ const MAX_SINGLE_SHOT_BYTES = 100 * 1024 * 1024;
 type Owner = { userId: string } | { anonymousSessionId: string };
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  const userId = session?.user?.id;
-
-  // Anonymous uploads are the higher-abuse-risk surface (no account, no
-  // cost to the abuser) — cap them tighter than authenticated uploads.
-  try {
-    const ip = getClientIp(request);
-    await checkRateLimit(`${ip}:upload:${userId ? "auth" : "anon"}`, {
-      limit: userId ? 60 : 20,
-      windowMs: 10 * 60 * 1000,
-    });
-  } catch (error) {
-    if (error instanceof RateLimitExceededError) {
-      return NextResponse.json(
-        { error: "Too many uploads. Try again shortly." },
-        { status: 429, headers: { "Retry-After": String(error.retryAfterSeconds) } }
-      );
-    }
-    throw error;
-  }
-
-  // Anonymous visitors don't have folders — folderId only applies to
-  // authenticated uploads.
-  const folderId = userId ? new URL(request.url).searchParams.get("folderId") : null;
-  if (folderId) {
-    const folder = await prisma.folder.findUnique({ where: { id: folderId } });
-    if (!folder || folder.userId !== userId) {
-      return NextResponse.json({ error: "Folder not found." }, { status: 404 });
-    }
-  }
-
-  let owner: Owner;
-  if (userId) {
-    owner = { userId };
-  } else {
-    const anonId = request.headers.get(ANON_HEADER_NAME);
-    if (!anonId) {
-      // Should never happen — proxy.ts sets this on every matched request.
-      return NextResponse.json({ error: "Could not identify session." }, { status: 400 });
-    }
-    await ensureAnonymousSession(anonId);
-    owner = { anonymousSessionId: anonId };
-  }
-
   const contentType = request.headers.get("content-type");
   if (!contentType?.includes("multipart/form-data")) {
     return NextResponse.json({ error: "Expected multipart/form-data." }, { status: 400 });
@@ -88,6 +44,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Empty request body." }, { status: 400 });
   }
 
+  // Everything above this point only reads headers — synchronous. Auth, rate
+  // limiting, and the anonymous-session lookup all do real round-trips to a
+  // remote DB, and used to run before busboy ever touched request.body.
+  // Empirically, that gap was long enough for anything past a few MB to
+  // reproducibly break — busboy's own parser would error with "Unexpected
+  // end of form" (dev) or the request would just hang (production) because
+  // request.body sat unconsumed the whole time. Fix: start draining it into
+  // busboy immediately, and run all the DB/auth work concurrently inside the
+  // 'file' handler instead of gating busboy's setup behind it.
   return new Promise<NextResponse>((resolve) => {
     let settled = false;
     const settle = (response: NextResponse) => {
@@ -108,32 +73,91 @@ export async function POST(request: NextRequest) {
       sawFile = true;
       const { filename, mimeType } = info;
 
+      // Same reasoning again, one level down: everything in the async block
+      // below is a DB round-trip, so the per-file stream must be drained
+      // synchronously into a buffer rather than left unconsumed while we
+      // await auth/quota/etc.
+      const buffered = new PassThrough({ highWaterMark: 4 * 1024 * 1024 });
+      fileStream.pipe(buffered);
+
       void (async () => {
         let reserved: Awaited<ReturnType<typeof reserveQuota>> | undefined;
         try {
-          reserved = await reserveQuota(
-            owner,
-            declaredSize,
-            { originalName: filename || "untitled", mimeType: mimeType || "application/octet-stream", folderId }
-          );
+          const session = await auth();
+          const userId = session?.user?.id;
+
+          // Anonymous uploads are the higher-abuse-risk surface (no account,
+          // no cost to the abuser) — cap them tighter than authenticated ones.
+          try {
+            const ip = getClientIp(request);
+            await checkRateLimit(`${ip}:upload:${userId ? "auth" : "anon"}`, {
+              limit: userId ? 60 : 20,
+              windowMs: 10 * 60 * 1000,
+            });
+          } catch (error) {
+            if (error instanceof RateLimitExceededError) {
+              buffered.destroy();
+              settle(
+                NextResponse.json(
+                  { error: "Too many uploads. Try again shortly." },
+                  { status: 429, headers: { "Retry-After": String(error.retryAfterSeconds) } }
+                )
+              );
+              return;
+            }
+            throw error;
+          }
+
+          // Anonymous visitors don't have folders — folderId only applies to
+          // authenticated uploads.
+          const folderId = userId ? new URL(request.url).searchParams.get("folderId") : null;
+          if (folderId) {
+            const folder = await prisma.folder.findUnique({ where: { id: folderId } });
+            if (!folder || folder.userId !== userId) {
+              buffered.destroy();
+              settle(NextResponse.json({ error: "Folder not found." }, { status: 404 }));
+              return;
+            }
+          }
+
+          let owner: Owner;
+          if (userId) {
+            owner = { userId };
+          } else {
+            const anonId = request.headers.get(ANON_HEADER_NAME);
+            if (!anonId) {
+              // Should never happen — proxy.ts sets this on every matched request.
+              buffered.destroy();
+              settle(NextResponse.json({ error: "Could not identify session." }, { status: 400 }));
+              return;
+            }
+            await ensureAnonymousSession(anonId);
+            owner = { anonymousSessionId: anonId };
+          }
+
+          reserved = await reserveQuota(owner, declaredSize, {
+            originalName: filename || "untitled",
+            mimeType: mimeType || "application/octet-stream",
+            folderId,
+          });
 
           const writeStream = await createFileWriteStream(reserved.storageKey);
           const hash = createHash("sha256");
           let bytesWritten = 0;
 
-          fileStream.on("data", (chunk: Buffer) => {
+          buffered.on("data", (chunk: Buffer) => {
             bytesWritten += chunk.length;
             hash.update(chunk);
             // Defense in depth: Content-Length is an upper bound on the whole
             // multipart body, so a single file's real bytes should never
             // approach it. If a client lies, bail rather than fill the disk.
             if (BigInt(bytesWritten) > declaredSize) {
-              fileStream.unpipe(writeStream);
+              buffered.unpipe(writeStream);
               writeStream.destroy(new Error("Stream exceeded declared size."));
             }
           });
 
-          await pipeline(fileStream, writeStream);
+          await pipeline(buffered, writeStream);
 
           const committed = await commitQuota(reserved.id, BigInt(bytesWritten), hash.digest("hex"));
 
@@ -148,6 +172,7 @@ export async function POST(request: NextRequest) {
             })
           );
         } catch (error) {
+          buffered.destroy();
           if (reserved) {
             await deleteStoredFile(reserved.storageKey).catch(() => {});
             await releaseQuota(reserved.id).catch(() => {});

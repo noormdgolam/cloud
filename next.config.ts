@@ -11,6 +11,14 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  experimental: {
+    // Every request (including /api/upload) passes through proxy.ts for the
+    // anonymous-session header — Next.js caps request bodies through that
+    // layer at 10MB by default, silently truncating anything larger before
+    // it reaches the route handler. Match this to MAX_SINGLE_SHOT_BYTES in
+    // src/app/api/upload/route.ts.
+    proxyClientMaxBodySize: "100mb",
+  },
   async headers() {
     return [
       {
