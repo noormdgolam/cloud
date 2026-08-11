@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MoreHorizontal, Download, Pencil, Trash2, Share2 } from "lucide-react";
+import { MoreHorizontal, Download, Pencil, Trash2, Share2, FolderInput } from "lucide-react";
 import { formatBytes, formatRelativeDate } from "@/lib/format";
 import { mimeIcon } from "@/lib/mime-icon";
 import { deleteFile, renameFile } from "@/lib/actions/file-actions";
@@ -15,6 +15,7 @@ import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { ShareDialog } from "./ShareDialog";
+import { MoveFileDialog } from "./MoveFileDialog";
 
 function triggerDownload(url: string) {
   const link = document.createElement("a");
@@ -31,16 +32,19 @@ export function FileRow({
   size,
   mimeType,
   createdAt,
+  folderId = null,
 }: {
   id: string;
   name: string;
   size: bigint;
   mimeType: string;
   createdAt: Date;
+  folderId?: string | null;
 }) {
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
   const renameAction = renameFile.bind(null, id);
 
   return (
@@ -63,7 +67,7 @@ export function FileRow({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
-            className="rounded-lg p-1.5 text-ink-faint opacity-0 transition-opacity hover:bg-[var(--glass-surface-hover)] hover:text-ink group-hover:opacity-100 data-[state=open]:opacity-100"
+            className="rounded-lg p-1.5 text-ink-faint transition-opacity hover:bg-[var(--glass-surface-hover)] hover:text-ink md:opacity-0 md:group-hover:opacity-100 md:data-[state=open]:opacity-100"
             aria-label={`Options for ${name}`}
           >
             <MoreHorizontal className="size-4" aria-hidden />
@@ -82,6 +86,10 @@ export function FileRow({
             <Pencil className="size-3.5" aria-hidden />
             Rename
           </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setMoveOpen(true)}>
+            <FolderInput className="size-3.5" aria-hidden />
+            Move to...
+          </DropdownMenuItem>
           <DropdownMenuItem destructive onSelect={() => setDeleteOpen(true)}>
             <Trash2 className="size-3.5" aria-hidden />
             Delete
@@ -90,6 +98,7 @@ export function FileRow({
       </DropdownMenu>
 
       <ShareDialog fileId={id} fileName={name} open={shareOpen} onOpenChange={setShareOpen} />
+      <MoveFileDialog fileId={id} currentFolderId={folderId} open={moveOpen} onOpenChange={setMoveOpen} />
 
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
         <DialogContent title="Rename file">

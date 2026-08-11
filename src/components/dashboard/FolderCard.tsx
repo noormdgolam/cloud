@@ -31,7 +31,7 @@ export function FolderCard({ id, name }: { id: string; name: string }) {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
-            className="rounded-lg p-1.5 text-ink-faint opacity-0 transition-opacity hover:bg-[var(--glass-surface-hover)] hover:text-ink group-hover:opacity-100 data-[state=open]:opacity-100"
+            className="rounded-lg p-1.5 text-ink-faint transition-opacity hover:bg-[var(--glass-surface-hover)] hover:text-ink md:opacity-0 md:group-hover:opacity-100 md:data-[state=open]:opacity-100"
             aria-label={`Options for ${name}`}
           >
             <MoreHorizontal className="size-4" aria-hidden />
