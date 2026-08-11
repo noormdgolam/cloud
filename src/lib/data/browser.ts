@@ -2,6 +2,35 @@ import { prisma } from "@/lib/prisma";
 
 export type BreadcrumbEntry = { id: string; name: string };
 
+export type SearchResultFile = {
+  id: string;
+  originalName: string;
+  size: bigint;
+  mimeType: string;
+  createdAt: Date;
+  folderId: string | null;
+  folderName: string | null;
+};
+
+export async function searchFiles(userId: string, query: string): Promise<SearchResultFile[]> {
+  const files = await prisma.file.findMany({
+    where: { userId, status: "COMMITTED", originalName: { contains: query } },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+    include: { folder: { select: { name: true } } },
+  });
+
+  return files.map((file) => ({
+    id: file.id,
+    originalName: file.originalName,
+    size: file.size,
+    mimeType: file.mimeType,
+    createdAt: file.createdAt,
+    folderId: file.folderId,
+    folderName: file.folder?.name ?? null,
+  }));
+}
+
 export async function getFolderContents(userId: string, folderId: string | null) {
   let breadcrumbs: BreadcrumbEntry[] = [];
 

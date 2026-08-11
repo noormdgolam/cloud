@@ -1,17 +1,30 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { getFolderContents } from "@/lib/data/browser";
+import { getFolderContents, searchFiles } from "@/lib/data/browser";
 import { hasClaimableFiles } from "@/lib/actions/claim-actions";
 import { FileBrowser } from "@/components/dashboard/FileBrowser";
 import { ClaimBanner } from "@/components/dashboard/ClaimBanner";
+import { SearchResults } from "@/components/dashboard/SearchResults";
 
 export const metadata: Metadata = { title: "My files" };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) redirect("/login");
+
+  const { q } = await searchParams;
+  const query = q?.trim();
+
+  if (query) {
+    const results = await searchFiles(userId, query);
+    return <SearchResults query={query} results={results} />;
+  }
 
   const [contents, claimable] = await Promise.all([
     getFolderContents(userId, null),

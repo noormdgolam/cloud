@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Cloud, FolderOpen, LogOut, Menu, Settings } from "lucide-react";
+import { Cloud, FolderOpen, LogOut, Menu, Search, Settings } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { signOutAction } from "@/lib/actions/auth-actions";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/Dialog";
+import { Input } from "@/components/ui/Input";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { StorageMeter } from "./StorageMeter";
 
@@ -41,7 +42,23 @@ function SidebarBody({
 
   return (
     <>
-      <nav className="mt-6 flex flex-1 flex-col gap-1">
+      <form action="/dashboard" className="mt-6">
+        <div className="relative">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-ink-faint"
+            aria-hidden
+          />
+          <Input
+            name="q"
+            type="search"
+            placeholder="Search files…"
+            className="py-2 pl-8 text-sm"
+            aria-label="Search files"
+          />
+        </div>
+      </form>
+
+      <nav className="mt-4 flex flex-1 flex-col gap-1">
         <Link
           href="/dashboard"
           onClick={onNavigate}
