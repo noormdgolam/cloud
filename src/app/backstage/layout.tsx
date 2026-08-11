@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ShieldAlert } from "lucide-react";
 import { requireAdmin } from "@/lib/admin-auth";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 export const metadata = { title: "Backstage", robots: { index: false, follow: false } };
 
@@ -17,6 +18,7 @@ export default async function BackstageLayout({ children }: LayoutProps<"/backst
           </Link>
           <div className="flex items-center gap-3 text-xs text-ink-faint">
             <span>{admin.name ?? admin.email}</span>
+            <ThemeToggle />
             <Link href="/dashboard" className="hover:text-ink">
               Exit
             </Link>

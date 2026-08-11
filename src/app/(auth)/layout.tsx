@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { Cloud } from "lucide-react";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 export default function AuthLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center bg-bg-1 px-4 py-12">
       <div className="grid-fade glow-accent pointer-events-none absolute inset-0" aria-hidden />
+      <ThemeToggle className="absolute right-4 top-4" />
       <Link
         href="/"
         className="relative mb-8 flex items-center gap-2 text-ink"

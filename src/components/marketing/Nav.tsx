@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Cloud } from "lucide-react";
 import { LinkButton } from "@/components/ui/Button";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 export function Nav() {
   return (
@@ -23,6 +24,7 @@ export function Nav() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <LinkButton href="/login" variant="ghost" className="hidden px-4 py-2 text-sm sm:inline-flex">
             Sign in
           </LinkButton>
