@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Cloud } from "lucide-react";
 
 export function Footer() {
@@ -9,7 +10,15 @@ export function Footer() {
           <span>bongshai.cloud</span>
         </div>
         <p>Free tier: 25GB registered · 2GB without an account.</p>
-        <p>&copy; {new Date().getFullYear()} Bongshai Cloud</p>
+        <div className="flex items-center gap-4">
+          <Link href="/terms" className="hover:text-ink">
+            Terms
+          </Link>
+          <Link href="/privacy" className="hover:text-ink">
+            Privacy
+          </Link>
+          <p>&copy; {new Date().getFullYear()} Bongshai Cloud</p>
+        </div>
       </div>
     </footer>
   );
