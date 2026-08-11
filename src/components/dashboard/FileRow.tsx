@@ -16,6 +16,13 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { ShareDialog } from "./ShareDialog";
 import { MoveFileDialog } from "./MoveFileDialog";
+import { PreviewDialog } from "./PreviewDialog";
+
+// Mirrors the server-side check in the download route — SVG excluded since
+// it can carry scripts and there's no CSP here to sandbox that.
+function isPreviewable(mimeType: string): boolean {
+  return (mimeType.startsWith("image/") && mimeType !== "image/svg+xml") || mimeType === "application/pdf";
+}
 
 function triggerDownload(url: string) {
   const link = document.createElement("a");
@@ -45,20 +52,36 @@ export function FileRow({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const renameAction = renameFile.bind(null, id);
+  const previewable = isPreviewable(mimeType);
 
   return (
     <div className="group flex items-center gap-3 rounded-xl px-3.5 py-3 transition-colors hover:bg-[var(--glass-surface-hover)]">
-      <a
-        href={`/api/files/${id}/download`}
-        className="flex min-w-0 flex-1 items-center gap-3"
-        title={`Download ${name}`}
-      >
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-bg-2">
-          {mimeIcon(mimeType, "size-4 text-ink-muted")}
-        </span>
-        <span className="min-w-0 flex-1 truncate text-sm text-ink">{name}</span>
-      </a>
+      {previewable ? (
+        <button
+          type="button"
+          onClick={() => setPreviewOpen(true)}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          title={`Preview ${name}`}
+        >
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-bg-2">
+            {mimeIcon(mimeType, "size-4 text-ink-muted")}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-sm text-ink">{name}</span>
+        </button>
+      ) : (
+        <a
+          href={`/api/files/${id}/download`}
+          className="flex min-w-0 flex-1 items-center gap-3"
+          title={`Download ${name}`}
+        >
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-bg-2">
+            {mimeIcon(mimeType, "size-4 text-ink-muted")}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-sm text-ink">{name}</span>
+        </a>
+      )}
       <span className="hidden font-mono text-xs text-ink-faint sm:block">
         {formatRelativeDate(createdAt)}
       </span>
@@ -99,6 +122,15 @@ export function FileRow({
 
       <ShareDialog fileId={id} fileName={name} open={shareOpen} onOpenChange={setShareOpen} />
       <MoveFileDialog fileId={id} currentFolderId={folderId} open={moveOpen} onOpenChange={setMoveOpen} />
+      {previewable && (
+        <PreviewDialog
+          fileId={id}
+          fileName={name}
+          mimeType={mimeType}
+          open={previewOpen}
+          onOpenChange={setPreviewOpen}
+        />
+      )}
 
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
         <DialogContent title="Rename file">

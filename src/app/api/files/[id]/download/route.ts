@@ -30,9 +30,22 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/files/[i
   const totalSize = Number(file.size);
   const rangeHeader = request.headers.get("range");
 
+  // Inline viewing is only ever honored for types that can't carry an
+  // active-content risk when rendered directly in this origin — SVG is
+  // deliberately excluded from "image/*" since it can embed scripts, and
+  // there's no CSP here to sandbox that. Checked server-side (not just
+  // hidden in the UI) so requesting ?inline=1 on a disallowed type can't
+  // bypass it.
+  const previewable =
+    (file.mimeType.startsWith("image/") && file.mimeType !== "image/svg+xml") ||
+    file.mimeType === "application/pdf";
+  const wantsInline = request.nextUrl.searchParams.get("inline") === "1" && previewable;
+
   const headers = new Headers({
     "Content-Type": file.mimeType || "application/octet-stream",
-    "Content-Disposition": `attachment; filename="${encodeURIComponent(file.originalName)}"`,
+    "Content-Disposition": wantsInline
+      ? `inline; filename="${encodeURIComponent(file.originalName)}"`
+      : `attachment; filename="${encodeURIComponent(file.originalName)}"`,
     "X-Content-Type-Options": "nosniff",
     "Accept-Ranges": "bytes",
     "Cache-Control": "private, no-store",
