@@ -3,3 +3,4 @@ Allow: /
 Disallow: /dashboard
 Disallow: /folder
 Disallow: /api
+Disallow: /backstage

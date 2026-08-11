@@ -3,7 +3,8 @@ import { Cloud } from "lucide-react";
 
 export default function AuthLayout({ children }: LayoutProps<"/">) {
   return (
-    <div className="grid-fade glow-accent relative flex min-h-screen flex-col items-center justify-center bg-bg-1 px-4 py-12">
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-bg-1 px-4 py-12">
+      <div className="grid-fade glow-accent pointer-events-none absolute inset-0" aria-hidden />
       <Link
         href="/"
         className="relative mb-8 flex items-center gap-2 text-ink"
