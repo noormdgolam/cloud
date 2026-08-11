@@ -1,0 +1,29 @@
+name: Cleanup anonymous files (cron)
+
+# This host doesn't give us a reliable way to run scheduled jobs on the
+# server itself (cPanel Cron Jobs sits behind the same restrictions as the
+# rest of cPanel's UI/API for this account) — so the trigger lives here
+# instead, hitting the app's own /api/cron/cleanup-anonymous route. That
+# route is gated by an HMAC token derived from CRON_SECRET (a dedicated
+# secret, set independently in cPanel's Node.js Selector env vars — do not
+# reuse AUTH_SECRET, it's not guaranteed to match between environments),
+# verified to match between Node (src/lib/cron-auth.ts) and this workflow's
+# openssl computation before this was wired up.
+on:
+  schedule:
+    - cron: "0 3 * * *" # 03:00 UTC daily
+  workflow_dispatch: {}
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call cleanup-anonymous endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          TOKEN=$(printf '%s' "cron:cleanup-anonymous" | openssl dgst -sha256 -hmac "$CRON_SECRET" -r | awk '{print $1}')
+          curl -sf -X GET "https://cloud.bongshai.com/api/cron/cleanup-anonymous" \
+            -H "x-cron-token: $TOKEN" \
+            -o response.json -w "HTTP %{http_code}\n"
+          cat response.json
