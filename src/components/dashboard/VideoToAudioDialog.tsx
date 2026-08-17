@@ -14,27 +14,22 @@ function formatTime(sec: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export function VideoToAudioDialog({
+function VideoToAudioContent({
   fileId,
   fileName,
   folderId,
-  open,
-  onOpenChange,
+  onClose,
 }: {
   fileId: string;
   fileName: string;
   folderId: string | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onClose: () => void;
 }) {
   const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
   const [saving, setSaving] = useState<Format | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) return;
-    setBuffer(null);
-    setError(null);
     let cancelled = false;
     fetch(`/api/files/${fileId}/download?inline=1`)
       .then((res) => res.arrayBuffer())
@@ -48,7 +43,7 @@ export function VideoToAudioDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, fileId]);
+  }, [fileId]);
 
   async function handleSave(format: Format) {
     if (!buffer) return;
@@ -58,7 +53,7 @@ export function VideoToAudioDialog({
       const blob = format === "mp3" ? audioBufferToMp3(buffer) : audioBufferToWav(buffer);
       const outName = `${fileName.replace(/\.[^.]+$/, "")}.${format}`;
       await uploadFile(new File([blob], outName, { type: blob.type }), folderId, () => {});
-      onOpenChange(false);
+      onClose();
     } catch {
       setError(`Couldn't save the ${format.toUpperCase()}.`);
     } finally {
@@ -67,40 +62,68 @@ export function VideoToAudioDialog({
   }
 
   return (
+    <>
+      {!buffer ? (
+        <p className="p-6 text-center text-sm text-ink-faint">{error ?? "Reading audio track…"}</p>
+      ) : (
+        <>
+          <p className="text-sm text-ink-muted">
+            {formatTime(buffer.duration)} · {buffer.numberOfChannels === 1 ? "mono" : "stereo"} ·{" "}
+            {buffer.sampleRate.toLocaleString()} Hz
+          </p>
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="accent"
+              className="flex-1"
+              disabled={saving !== null}
+              onClick={() => handleSave("mp3")}
+            >
+              {saving === "mp3" ? "Encoding MP3…" : "Save as MP3"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="flex-1"
+              disabled={saving !== null}
+              onClick={() => handleSave("wav")}
+            >
+              {saving === "wav" ? "Encoding WAV…" : "Save as WAV"}
+            </Button>
+          </div>
+
+          {error && <p className="text-center text-xs text-danger">{error}</p>}
+        </>
+      )}
+    </>
+  );
+}
+
+export function VideoToAudioDialog({
+  fileId,
+  fileName,
+  folderId,
+  open,
+  onOpenChange,
+}: {
+  fileId: string;
+  fileName: string;
+  folderId: string | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent title={`Extract audio from ${fileName}`} className="flex flex-col gap-4">
-        {!buffer ? (
-          <p className="p-6 text-center text-sm text-ink-faint">{error ?? "Reading audio track…"}</p>
-        ) : (
-          <>
-            <p className="text-sm text-ink-muted">
-              {formatTime(buffer.duration)} · {buffer.numberOfChannels === 1 ? "mono" : "stereo"} ·{" "}
-              {buffer.sampleRate.toLocaleString()} Hz
-            </p>
-
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button
-                type="button"
-                variant="accent"
-                className="flex-1"
-                disabled={saving !== null}
-                onClick={() => handleSave("mp3")}
-              >
-                {saving === "mp3" ? "Encoding MP3…" : "Save as MP3"}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className="flex-1"
-                disabled={saving !== null}
-                onClick={() => handleSave("wav")}
-              >
-                {saving === "wav" ? "Encoding WAV…" : "Save as WAV"}
-              </Button>
-            </div>
-
-            {error && <p className="text-center text-xs text-danger">{error}</p>}
-          </>
+        {open && (
+          <VideoToAudioContent
+            key={fileId}
+            fileId={fileId}
+            fileName={fileName}
+            folderId={folderId}
+            onClose={() => onOpenChange(false)}
+          />
         )}
       </DialogContent>
     </Dialog>

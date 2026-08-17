@@ -82,7 +82,7 @@ function getClient() {
 // scope would crash the build itself. Only the first actual property
 // access — which only happens inside a request — creates the client.
 export const prisma = new Proxy({} as PrismaClient, {
-  get(_target, prop, _receiver) {
+  get(_target, prop) {
     const client = getClient();
     const value = Reflect.get(client as object, prop, client);
     return typeof value === "function" ? value.bind(client) : value;

@@ -110,20 +110,16 @@ async function enhanceAudio(buffer: AudioBuffer): Promise<AudioBuffer> {
 
 type Stage = "idle" | "loading" | "ready" | "enhancing" | "done" | "error";
 
-export function AudioEnhanceDialog({
+function AudioEnhanceContent({
   fileId,
   fileName,
   folderId,
-  open,
-  onOpenChange,
 }: {
   fileId: string;
   fileName: string;
   folderId: string | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
 }) {
-  const [stage, setStage] = useState<Stage>("idle");
+  const [stage, setStage] = useState<Stage>("loading");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [origBuffer, setOrigBuffer] = useState<AudioBuffer | null>(null);
@@ -138,47 +134,6 @@ export function AudioEnhanceDialog({
 
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
-
-  // ── fetch + decode original audio on open ──────────────────────────────
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    setStage("loading");
-    setErrorMsg(null);
-    setOrigBuffer(null);
-    setEnhBuffer(null);
-    setOrigPeaks([]);
-    setEnhPeaks([]);
-    setSaved(false);
-
-    fetch(`/api/files/${fileId}/download?inline=1`)
-      .then((r) => r.arrayBuffer())
-      .then(decodeAudio)
-      .then((buf) => {
-        if (cancelled) return;
-        setOrigBuffer(buf);
-        setOrigPeaks(getWaveformPeaks(buf, WAVEFORM_PEAKS));
-        setStage("ready");
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setStage("error");
-          setErrorMsg("Couldn't load this audio file.");
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, fileId]);
-
-  // ── stop playback when dialog closes ───────────────────────────────────
-  useEffect(() => {
-    if (!open) {
-      stopPlayback();
-      ctxRef.current?.close();
-    }
-  }, [open]);
 
   function stopPlayback() {
     try { sourceRef.current?.stop(); } catch { /* already stopped */ }
@@ -198,6 +153,33 @@ export function AudioEnhanceDialog({
     sourceRef.current = src;
     setPlaying(which);
   }
+
+  // ── fetch + decode original audio on mount ──────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch(`/api/files/${fileId}/download?inline=1`)
+      .then((r) => r.arrayBuffer())
+      .then(decodeAudio)
+      .then((buf) => {
+        if (cancelled) return;
+        setOrigBuffer(buf);
+        setOrigPeaks(getWaveformPeaks(buf, WAVEFORM_PEAKS));
+        setStage("ready");
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setStage("error");
+          setErrorMsg("Couldn't load this audio file.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      stopPlayback();
+      ctxRef.current?.close();
+    };
+  }, [fileId]);
 
   // ── one-click enhance ───────────────────────────────────────────────────
   async function handleEnhance() {
@@ -237,167 +219,193 @@ export function AudioEnhanceDialog({
   /* ── derived ──────────────────────────────────────────────────────────── */
   const duration = origBuffer?.duration ?? 0;
 
-  /* ── render ────────────────────────────────────────────────────────────── */
+  return (
+    <>
+      {/* ── loading / error states ─────────────────────────────────────── */}
+      {stage === "loading" && (
+        <div className="flex flex-col items-center gap-3 py-8">
+          <span className="size-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+          <p className="text-sm text-ink-faint">Loading audio…</p>
+        </div>
+      )}
+
+      {stage === "error" && (
+        <p className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+          {errorMsg ?? "Something went wrong."}
+        </p>
+      )}
+
+      {/* ── main UI ───────────────────────────────────────────────────── */}
+      {(stage === "ready" || stage === "enhancing" || stage === "done") && origBuffer && (
+        <>
+          {/* ── waveform comparison ──────────────────────────────────── */}
+          <div className="flex flex-col gap-3">
+            {/* Original */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-ink-muted">Original</span>
+                <span className="text-xs text-ink-faint">{formatTime(duration)}</span>
+              </div>
+              <div className="relative h-16 w-full overflow-hidden rounded-lg bg-bg-2">
+                <Waveform peaks={origPeaks} color="var(--color-ink-faint)" />
+                {stage !== "done" && (
+                  <button
+                    type="button"
+                    aria-label={playing === "orig" ? "Stop original" : "Preview original"}
+                    onClick={() => playing === "orig" ? stopPlayback() : playBuffer(origBuffer, "orig")}
+                    className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/20 rounded-lg"
+                  >
+                    {playing === "orig"
+                      ? <Square className="size-4 text-white" />
+                      : <Play className="size-4 text-white" />}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Enhanced — shown after processing */}
+            {stage === "done" && enhBuffer && (
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-accent-2">✦ Enhanced</span>
+                  <span className="text-xs text-ink-faint">{formatTime(enhBuffer.duration)}</span>
+                </div>
+                <div className="relative h-16 w-full overflow-hidden rounded-lg bg-bg-2">
+                  <Waveform peaks={enhPeaks} color="var(--color-accent)" />
+                  <button
+                    type="button"
+                    aria-label={playing === "enh" ? "Stop enhanced" : "Preview enhanced"}
+                    onClick={() => playing === "enh" ? stopPlayback() : playBuffer(enhBuffer, "enh")}
+                    className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/20 rounded-lg"
+                  >
+                    {playing === "enh"
+                      ? <Square className="size-4 text-white" />
+                      : <Play className="size-4 text-white" />}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── enhancement steps badge strip ────────────────────────── */}
+          <div className="flex flex-wrap gap-2">
+            {[
+              "Rumble removal",
+              "Hiss reduction",
+              "Voice clarity",
+              "Dynamic compression",
+              "Loudness normalisation",
+            ].map((label) => (
+              <span
+                key={label}
+                className="rounded-full border border-border bg-bg-2 px-2.5 py-0.5 text-[11px] text-ink-faint"
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+
+          {/* ── processing spinner ───────────────────────────────────── */}
+          {stage === "enhancing" && (
+            <div className="flex items-center gap-3 rounded-xl border border-accent/20 bg-accent/5 px-4 py-3">
+              <span className="size-4 animate-spin rounded-full border-2 border-accent border-t-transparent shrink-0" />
+              <p className="text-sm text-ink">AI is beautifying your audio…</p>
+            </div>
+          )}
+
+          {/* ── error banner ─────────────────────────────────────────── */}
+          {errorMsg && (
+            <p className="rounded-xl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm text-danger">
+              {errorMsg}
+            </p>
+          )}
+
+          {/* ── action buttons ───────────────────────────────────────── */}
+          <div className="flex flex-col gap-2">
+            {stage === "ready" && (
+              <Button
+                id="audio-enhance-btn"
+                type="button"
+                variant="accent"
+                className="w-full gap-2"
+                onClick={handleEnhance}
+                data-mcp-action="enhance-audio"
+              >
+                <Wand2 className="size-4" aria-hidden />
+                Enhance Audio
+              </Button>
+            )}
+
+            {stage === "done" && (
+              <>
+                <Button
+                  id="audio-enhance-again-btn"
+                  type="button"
+                  variant="ghost"
+                  className="w-full gap-2 text-xs"
+                  onClick={handleEnhance}
+                >
+                  <Wand2 className="size-3.5" aria-hidden />
+                  Re-enhance
+                </Button>
+
+                {saved ? (
+                  <div className="flex items-center justify-center gap-2 rounded-xl border border-accent/30 bg-accent/10 px-4 py-2.5 text-sm text-accent-2">
+                    <CheckCircle2 className="size-4" aria-hidden />
+                    Saved to your storage!
+                  </div>
+                ) : (
+                  <Button
+                    id="audio-enhance-save-btn"
+                    type="button"
+                    variant="accent"
+                    className="w-full gap-2"
+                    disabled={saving}
+                    onClick={handleSave}
+                    data-mcp-action="save-enhanced-audio"
+                  >
+                    <Download className="size-4" aria-hidden />
+                    {saving ? "Saving…" : "Save enhanced file"}
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+export function AudioEnhanceDialog({
+  fileId,
+  fileName,
+  folderId,
+  open,
+  onOpenChange,
+}: {
+  fileId: string;
+  fileName: string;
+  folderId: string | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent title={`Enhance "${fileName}"`} className="flex flex-col gap-5">
-
-        {/* ── loading / error states ─────────────────────────────────────── */}
-        {stage === "loading" && (
-          <div className="flex flex-col items-center gap-3 py-8">
-            <span className="size-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-            <p className="text-sm text-ink-faint">Loading audio…</p>
-          </div>
-        )}
-
-        {stage === "error" && (
-          <p className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-            {errorMsg ?? "Something went wrong."}
-          </p>
-        )}
-
-        {/* ── main UI ───────────────────────────────────────────────────── */}
-        {(stage === "ready" || stage === "enhancing" || stage === "done") && origBuffer && (
-          <>
-            {/* ── waveform comparison ──────────────────────────────────── */}
-            <div className="flex flex-col gap-3">
-              {/* Original */}
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-ink-muted">Original</span>
-                  <span className="text-xs text-ink-faint">{formatTime(duration)}</span>
-                </div>
-                <div className="relative h-16 w-full overflow-hidden rounded-lg bg-bg-2">
-                  <Waveform peaks={origPeaks} color="var(--color-ink-faint)" />
-                  {stage !== "done" && (
-                    <button
-                      type="button"
-                      aria-label={playing === "orig" ? "Stop original" : "Preview original"}
-                      onClick={() => playing === "orig" ? stopPlayback() : playBuffer(origBuffer, "orig")}
-                      className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/20 rounded-lg"
-                    >
-                      {playing === "orig"
-                        ? <Square className="size-4 text-white" />
-                        : <Play className="size-4 text-white" />}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Enhanced — shown after processing */}
-              {stage === "done" && enhBuffer && (
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-accent-2">✦ Enhanced</span>
-                    <span className="text-xs text-ink-faint">{formatTime(enhBuffer.duration)}</span>
-                  </div>
-                  <div className="relative h-16 w-full overflow-hidden rounded-lg bg-bg-2">
-                    <Waveform peaks={enhPeaks} color="var(--color-accent)" />
-                    <button
-                      type="button"
-                      aria-label={playing === "enh" ? "Stop enhanced" : "Preview enhanced"}
-                      onClick={() => playing === "enh" ? stopPlayback() : playBuffer(enhBuffer, "enh")}
-                      className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/20 rounded-lg"
-                    >
-                      {playing === "enh"
-                        ? <Square className="size-4 text-white" />
-                        : <Play className="size-4 text-white" />}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* ── enhancement steps badge strip ────────────────────────── */}
-            <div className="flex flex-wrap gap-2">
-              {[
-                "Rumble removal",
-                "Hiss reduction",
-                "Voice clarity",
-                "Dynamic compression",
-                "Loudness normalisation",
-              ].map((label) => (
-                <span
-                  key={label}
-                  className="rounded-full border border-border bg-bg-2 px-2.5 py-0.5 text-[11px] text-ink-faint"
-                >
-                  {label}
-                </span>
-              ))}
-            </div>
-
-            {/* ── processing spinner ───────────────────────────────────── */}
-            {stage === "enhancing" && (
-              <div className="flex items-center gap-3 rounded-xl border border-accent/20 bg-accent/5 px-4 py-3">
-                <span className="size-4 animate-spin rounded-full border-2 border-accent border-t-transparent shrink-0" />
-                <p className="text-sm text-ink">AI is beautifying your audio…</p>
-              </div>
-            )}
-
-            {/* ── error banner ─────────────────────────────────────────── */}
-            {errorMsg && (
-              <p className="rounded-xl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm text-danger">
-                {errorMsg}
-              </p>
-            )}
-
-            {/* ── action buttons ───────────────────────────────────────── */}
-            <div className="flex flex-col gap-2">
-              {stage === "ready" && (
-                <Button
-                  id="audio-enhance-btn"
-                  type="button"
-                  variant="accent"
-                  className="w-full gap-2"
-                  onClick={handleEnhance}
-                  data-mcp-action="enhance-audio"
-                >
-                  <Wand2 className="size-4" aria-hidden />
-                  Enhance Audio
-                </Button>
-              )}
-
-              {stage === "done" && (
-                <>
-                  <Button
-                    id="audio-enhance-again-btn"
-                    type="button"
-                    variant="ghost"
-                    className="w-full gap-2 text-xs"
-                    onClick={handleEnhance}
-                  >
-                    <Wand2 className="size-3.5" aria-hidden />
-                    Re-enhance
-                  </Button>
-
-                  {saved ? (
-                    <div className="flex items-center justify-center gap-2 rounded-xl border border-accent/30 bg-accent/10 px-4 py-2.5 text-sm text-accent-2">
-                      <CheckCircle2 className="size-4" aria-hidden />
-                      Saved to your storage!
-                    </div>
-                  ) : (
-                    <Button
-                      id="audio-enhance-save-btn"
-                      type="button"
-                      variant="accent"
-                      className="w-full gap-2"
-                      disabled={saving}
-                      onClick={handleSave}
-                      data-mcp-action="save-enhanced-audio"
-                    >
-                      <Download className="size-4" aria-hidden />
-                      {saving ? "Saving…" : "Save enhanced file"}
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
-          </>
+        {open && (
+          <AudioEnhanceContent
+            key={fileId}
+            fileId={fileId}
+            fileName={fileName}
+            folderId={folderId}
+          />
         )}
       </DialogContent>
     </Dialog>
   );
 }
+
 
 /* ─── Waveform SVG sub-component ──────────────────────────────────────────── */
 
