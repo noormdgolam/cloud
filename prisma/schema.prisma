@@ -200,6 +200,14 @@ enum FileScanStatus {
   SKIPPED
 }
 
+enum ModerationStatus {
+  UNSCANNED
+  SAFE
+  FLAGGED_ADULT
+  FLAGGED_SUGGESTIVE
+  ERROR
+}
+
 model File {
   id             String     @id @default(cuid()) @db.VarChar(30)
   storageKey     String     @unique @db.VarChar(36) // UUID used verbatim as the on-disk filename, no extension
@@ -239,10 +247,25 @@ model File {
   shareLinks    ShareLink[]
   requestUpload FileRequestUpload?
   reel          Reel?
+  moderation    FileModeration?
 
   @@index([userId, folderId, createdAt])
   @@index([anonymousSessionId, folderId, createdAt])
   @@index([userId, status, checksumSha256])
+}
+
+model FileModeration {
+  id         String           @id @default(cuid()) @db.VarChar(30)
+  fileId     String           @unique @db.VarChar(30)
+  file       File             @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  status     ModerationStatus @default(UNSCANNED)
+  confidence Float?
+  category   String?          @db.VarChar(64)
+  reason     String?          @db.Text
+  flaggedAt  DateTime?
+  scannedAt  DateTime         @default(now())
+
+  @@index([status, scannedAt])
 }
 
 // One row per (file, visitor, day) that has already been counted toward

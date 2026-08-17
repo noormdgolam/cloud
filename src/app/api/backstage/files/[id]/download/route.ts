@@ -24,9 +24,12 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/backstag
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
+  const inline = request.nextUrl.searchParams.get("inline") === "1";
+  const disposition = inline ? "inline" : `attachment; filename="${encodeURIComponent(file.originalName)}"`;
+
   const headers = new Headers({
     "Content-Type": file.mimeType || "application/octet-stream",
-    "Content-Disposition": `attachment; filename="${encodeURIComponent(file.originalName)}"`,
+    "Content-Disposition": disposition,
     "X-Content-Type-Options": "nosniff",
     "Cache-Control": "private, no-store",
     "Content-Length": String(file.size),

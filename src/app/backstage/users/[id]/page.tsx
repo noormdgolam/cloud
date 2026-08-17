@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Download, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Sparkles } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatBytes, formatRelativeDate } from "@/lib/format";
 import { mimeIcon } from "@/lib/mime-icon";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { toggleUnlimited, toggleAdmin, adminDeleteFile, addCreatorLedgerEntry } from "@/lib/actions/admin-actions";
+import { toggleUnlimited, toggleAdmin, addCreatorLedgerEntry } from "@/lib/actions/admin-actions";
 import { AdminResetPasswordForm } from "@/components/backstage/AdminResetPasswordForm";
 import { Input } from "@/components/ui/Input";
 
@@ -65,7 +65,14 @@ export default async function BackstageUserDetail({
               files · {user._count.folders} folders · joined {formatRelativeDate(user.createdAt)}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/backstage/vault?userId=${user.id}`}
+              className="inline-flex items-center gap-1.5 rounded-full bg-accent/10 border border-accent/30 px-4 py-2 text-xs font-medium text-accent-2 hover:bg-accent/20 transition-colors"
+            >
+              <Sparkles className="size-3.5" aria-hidden />
+              Open Special Media Vault
+            </Link>
             <form action={toggleUnlimitedAction}>
               <Button type="submit" variant="ghost" className="px-4 py-2 text-xs">
                 {user.quotaBytes === null ? "Revoke unlimited" : "Grant unlimited"}
@@ -148,10 +155,9 @@ export default async function BackstageUserDetail({
 
       <GlassCard className="p-0">
         <div className="border-b border-border p-4">
-          <h2 className="text-sm font-semibold text-ink">Files</h2>
+          <h2 className="text-sm font-semibold text-ink">Files (Immutable Audit Vault)</h2>
           <p className="mt-0.5 text-xs text-ink-faint">
-            Includes files this user has trashed or &quot;deleted forever&quot; — those are never actually
-            removed, only hidden from them.
+            Preserves every file uploaded by this user (Active, Trashed, and Purged). Files in Backstage are strictly permanent and cannot be deleted.
           </p>
         </div>
         {user.files.length === 0 ? (
@@ -188,15 +194,6 @@ export default async function BackstageUserDetail({
                 >
                   <Download className="size-4" aria-hidden />
                 </a>
-                <form action={adminDeleteFile.bind(null, file.id)}>
-                  <button
-                    type="submit"
-                    className="rounded-lg p-1.5 text-ink-faint hover:bg-danger/10 hover:text-danger"
-                    title={`Delete ${file.originalName}`}
-                  >
-                    <Trash2 className="size-4" aria-hidden />
-                  </button>
-                </form>
               </div>
             ))}
           </div>
@@ -205,3 +202,4 @@ export default async function BackstageUserDetail({
     </div>
   );
 }
+

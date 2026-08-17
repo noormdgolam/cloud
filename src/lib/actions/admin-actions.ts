@@ -4,8 +4,6 @@ import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
-import { deleteStoredFile } from "@/lib/storage";
-import { adjustOwnerUsedBytes } from "@/lib/quota";
 import { adminResetPasswordSchema } from "@/lib/validators";
 import type { FormState } from "./auth-actions";
 
@@ -48,27 +46,6 @@ export async function toggleAdmin(userId: string, isAdmin: boolean) {
   revalidatePath("/backstage");
 }
 
-// God-mode delete: no ownership check, works on any user's or any anonymous
-// session's file. Otherwise mirrors the ordering in file-actions.ts —
-// release the DB row + quota first, disk cleanup second.
-export async function adminDeleteFile(fileId: string) {
-  await requireAdmin();
-
-  const file = await prisma.file.findUnique({ where: { id: fileId } });
-  if (!file) return;
-
-  await prisma.$transaction(async (tx) => {
-    await adjustOwnerUsedBytes(tx, file, -file.size);
-    await tx.file.delete({ where: { id: fileId } });
-  });
-
-  await deleteStoredFile(file.storageKey).catch((error) => {
-    console.error("Admin delete: failed to remove stored file from disk:", file.storageKey, error);
-  });
-
-  revalidatePath(file.userId ? `/backstage/users/${file.userId}` : "/backstage/anonymous");
-}
-
 // Manually records a creator-earnings ledger entry and keeps
 // User.creatorBalancePoisha in sync — CREDIT for a real ad-revenue share
 // distribution, PAYOUT for recording money actually sent. Never automatic.
@@ -100,4 +77,48 @@ export async function addCreatorLedgerEntry(userId: string, formData: FormData) 
   });
 
   revalidatePath(`/backstage/users/${userId}`);
+}
+
+export async function adminScanFileModeration(fileId: string) {
+  await requireAdmin();
+  const { scanImageForAdultContent } = await import("@/lib/moderation/vision-moderator");
+  const result = await scanImageForAdultContent(fileId);
+  revalidatePath("/backstage/moderation");
+  return result;
+}
+
+export async function adminScanBatchModeration(limit = 10) {
+  await requireAdmin();
+  const { scanBatchModeration } = await import("@/lib/moderation/vision-moderator");
+  const summary = await scanBatchModeration(limit);
+  revalidatePath("/backstage/moderation");
+  return summary;
+}
+
+export async function adminMarkModerationStatus(
+  fileId: string,
+  status: "SAFE" | "FLAGGED_ADULT" | "FLAGGED_SUGGESTIVE"
+) {
+  await requireAdmin();
+  await prisma.fileModeration.upsert({
+    where: { fileId },
+    create: {
+      fileId,
+      status,
+      confidence: 1.0,
+      category: status === "SAFE" ? "MANUAL_SAFE" : "MANUAL_FLAGGED",
+      reason: "Manually overridden by administrator",
+      flaggedAt: status !== "SAFE" ? new Date() : null,
+      scannedAt: new Date(),
+    },
+    update: {
+      status,
+      confidence: 1.0,
+      category: status === "SAFE" ? "MANUAL_SAFE" : "MANUAL_FLAGGED",
+      reason: "Manually overridden by administrator",
+      flaggedAt: status !== "SAFE" ? new Date() : null,
+      scannedAt: new Date(),
+    },
+  });
+  revalidatePath("/backstage/moderation");
 }
