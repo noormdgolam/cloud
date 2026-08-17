@@ -13,6 +13,7 @@ async function main() {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
+    connectTimeout: 10_000,
   });
 
   const tables: { TABLE_NAME: string; ENGINE: string }[] = await conn.query(

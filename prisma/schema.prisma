@@ -242,6 +242,7 @@ model File {
 
   @@index([userId, folderId, createdAt])
   @@index([anonymousSessionId, folderId, createdAt])
+  @@index([userId, status, checksumSha256])
 }
 
 // One row per (file, visitor, day) that has already been counted toward
