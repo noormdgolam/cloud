@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { authenticateCredentials } from "@/lib/actions/auth-actions";
 import { Input, Label } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -15,7 +16,12 @@ export function LoginForm() {
         <Input id="email" name="email" type="email" autoComplete="email" required />
       </div>
       <div>
-        <Label htmlFor="password">Password</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password" className="mb-0">Password</Label>
+          <Link href="/forgot-password" className="mb-1.5 text-xs font-medium text-ink-muted hover:text-accent-2">
+            Forgot password?
+          </Link>
+        </div>
         <Input
           id="password"
           name="password"

@@ -4,7 +4,10 @@ import Google from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { applyReferral } from "@/lib/referral";
+import { REFERRAL_COOKIE_NAME } from "@/lib/cookie-names";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -71,6 +74,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.id;
       }
       return session;
+    },
+  },
+  events: {
+    // Fires for OAuth signups (PrismaAdapter.createUser) — the credentials
+    // path applies its referral separately in registerUser, since that path
+    // never goes through the adapter's createUser.
+    async createUser({ user }) {
+      if (!user.id) return;
+      try {
+        const refCode = (await cookies()).get(REFERRAL_COOKIE_NAME)?.value;
+        if (refCode) await applyReferral(user.id, refCode);
+      } catch {
+        // Never block account creation over a referral hiccup.
+      }
     },
   },
 });

@@ -45,3 +45,9 @@ next-env.d.ts
 # scratch bundle assembled locally before syncing to the server — see the
 # cpanel_passenger_nextjs_deploy skill's "delete-then-swap" deploy pattern
 /ftp-deploy
+
+# local-only deploy tooling + FTP credentials — never committed
+/deploy-tool
+
+# full standalone-build copy used for local testing (own node_modules/.next/.env) — never committed
+/local-test

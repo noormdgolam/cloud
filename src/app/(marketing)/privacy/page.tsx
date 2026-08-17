@@ -3,7 +3,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 
 export const metadata: Metadata = { title: "Privacy Policy" };
 
-const UPDATED = "August 11, 2026";
+const UPDATED = "August 14, 2026";
 
 export default function PrivacyPage() {
   return (
@@ -61,10 +61,30 @@ export default function PrivacyPage() {
         </section>
 
         <section>
+          <h2 className="mb-2 text-base font-semibold text-ink">Malware scanning</h2>
+          <p>
+            Every uploaded file is checked against VirusTotal, a malware-scanning service. Most files are
+            matched instantly by content fingerprint, without ever leaving our servers. If a file&apos;s
+            fingerprint hasn&apos;t been seen before, the file itself is sent to VirusTotal for analysis and
+            retained there under their own retention policy — see{" "}
+            <a
+              href="https://www.virustotal.com/gui/privacy-policy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent underline underline-offset-2"
+            >
+              VirusTotal&apos;s privacy policy
+            </a>
+            . Files confirmed malicious are blocked from further downloads and sharing.
+          </p>
+        </section>
+
+        <section>
           <h2 className="mb-2 text-base font-semibold text-ink">Third parties</h2>
           <p>
             If you sign in with Google or GitHub, that authentication happens directly with them under
-            their own privacy policies. We don&apos;t share your data with any other third party.
+            their own privacy policies. We don&apos;t share your data with any other third party except
+            VirusTotal, as described above.
           </p>
         </section>
 

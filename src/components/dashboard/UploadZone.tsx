@@ -6,6 +6,7 @@ import { UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { formatBytes } from "@/lib/format";
 import { uploadFile } from "@/lib/client-upload";
+import { GoogleImportButton } from "./GoogleImportButton";
 
 type UploadTask = {
   id: string;
@@ -20,11 +21,13 @@ export function UploadZone({
   folderId,
   headerLeft,
   toolbarExtra,
+  googleImportEligible = false,
   children,
 }: {
   folderId: string | null;
   headerLeft?: React.ReactNode;
   toolbarExtra?: React.ReactNode;
+  googleImportEligible?: boolean;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -71,6 +74,9 @@ export function UploadZone({
   return (
     <div
       className="relative"
+      data-mcp-action="upload_file"
+      data-mcp-param-folder-id={folderId ?? "root"}
+      data-mcp-description="Upload single or multiple files to Bongshai Cloud storage"
       onDragOver={(e) => {
         e.preventDefault();
         setDragActive(true);
@@ -98,12 +104,15 @@ export function UploadZone({
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         {headerLeft}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {toolbarExtra}
+          {googleImportEligible && <GoogleImportButton onFilesReady={startUploads} />}
           <Button
             type="button"
             variant="accent"
             className="px-4 py-2 text-sm"
+            data-mcp-action="trigger_upload_dialog"
+            data-mcp-description="Open file selector dialog for uploading files"
             onClick={() => inputRef.current?.click()}
           >
             <UploadCloud className="size-4" aria-hidden />

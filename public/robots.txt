@@ -1,6 +1,35 @@
+# AI Crawler Access Policy & Discovery Rules — Bongshai Cloud
 User-agent: *
 Allow: /
 Disallow: /dashboard
 Disallow: /folder
 Disallow: /api
 Disallow: /backstage
+
+# Allow search-augmented AI citation engines to crawl public marketing, policies & FAQs
+User-agent: PerplexityBot
+Allow: /
+Disallow: /dashboard
+Disallow: /api
+
+User-agent: GPTBot
+Allow: /
+Disallow: /dashboard
+Disallow: /api
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /dashboard
+Disallow: /api
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+# Block aggressive scraping bots
+User-agent: Bytespider
+Disallow: /
+
+Sitemap: https://cloud.bongshai.com/sitemap.xml

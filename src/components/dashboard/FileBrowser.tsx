@@ -1,11 +1,12 @@
-import { FolderOpen } from "lucide-react";
-import type { BreadcrumbEntry, SortOption } from "@/lib/data/browser";
+import { Download, FolderOpen } from "lucide-react";
+import type { BreadcrumbEntry, FileScanStatus, SortOption } from "@/lib/data/browser";
 import { Breadcrumb } from "./Breadcrumb";
 import { FolderCard } from "./FolderCard";
-import { FileRow } from "./FileRow";
+import { SelectableFileList } from "./SelectableFileList";
 import { NewFolderDialog } from "./NewFolderDialog";
 import { SortSelect } from "./SortSelect";
 import { UploadZone } from "./UploadZone";
+import { LinkButton } from "@/components/ui/Button";
 
 type FolderSummary = { id: string; name: string };
 type FileSummary = {
@@ -14,6 +15,8 @@ type FileSummary = {
   size: bigint;
   mimeType: string;
   createdAt: Date;
+  isDuplicate: boolean;
+  scanStatus: FileScanStatus;
 };
 
 export function FileBrowser({
@@ -22,12 +25,14 @@ export function FileBrowser({
   folders,
   files,
   sort,
+  googleImportEligible = false,
 }: {
   parentId: string | null;
   breadcrumbs: BreadcrumbEntry[];
   folders: FolderSummary[];
   files: FileSummary[];
   sort: SortOption;
+  googleImportEligible?: boolean;
 }) {
   const isEmpty = folders.length === 0 && files.length === 0;
   const basePath = parentId ? `/folder/${parentId}` : "/dashboard";
@@ -35,10 +40,22 @@ export function FileBrowser({
   return (
     <UploadZone
       folderId={parentId}
+      googleImportEligible={googleImportEligible}
       headerLeft={<Breadcrumb entries={breadcrumbs} />}
       toolbarExtra={
         <>
           {files.length > 1 && <SortSelect basePath={basePath} sort={sort} />}
+          {parentId && !isEmpty && (
+            <LinkButton
+              href={`/api/files/zip?folderId=${parentId}`}
+              variant="ghost"
+              className="px-4 py-2 text-xs"
+              title="Download this folder as a zip"
+            >
+              <Download className="size-3.5" aria-hidden />
+              Download folder
+            </LinkButton>
+          )}
           <NewFolderDialog parentId={parentId} />
         </>
       }
@@ -62,21 +79,7 @@ export function FileBrowser({
             </div>
           )}
 
-          {files.length > 0 && (
-            <div className="glass flex flex-col gap-0.5 rounded-2xl p-2">
-              {files.map((file) => (
-                <FileRow
-                  key={file.id}
-                  id={file.id}
-                  name={file.originalName}
-                  size={file.size}
-                  mimeType={file.mimeType}
-                  createdAt={file.createdAt}
-                  folderId={parentId}
-                />
-              ))}
-            </div>
-          )}
+          {files.length > 0 && <SelectableFileList files={files} parentId={parentId} />}
         </div>
       )}
     </UploadZone>

@@ -2,9 +2,12 @@
 
 import { AuthError } from "next-auth";
 import bcrypt from "bcryptjs";
+import { cookies } from "next/headers";
 import { signIn, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loginSchema, registerSchema } from "@/lib/validators";
+import { applyReferral } from "@/lib/referral";
+import { REFERRAL_COOKIE_NAME } from "@/lib/cookie-names";
 
 export type FormState = { error?: string } | undefined;
 
@@ -64,9 +67,16 @@ export async function registerUser(
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  await prisma.user.create({
+  const created = await prisma.user.create({
     data: { name, email, passwordHash },
   });
+
+  const refCode = (await cookies()).get(REFERRAL_COOKIE_NAME)?.value;
+  if (refCode) {
+    await applyReferral(created.id, refCode).catch(() => {
+      // Never block signup over a referral hiccup.
+    });
+  }
 
   try {
     await signIn("credentials", {

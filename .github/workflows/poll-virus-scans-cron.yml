@@ -1,0 +1,24 @@
+name: Poll pending virus scans (cron)
+
+# See .github/workflows/cleanup-cron.yml for why the trigger lives here
+# instead of on the host itself. This one runs much more often since
+# VirusTotal analyses usually resolve within a minute or two, and a file
+# sits as "Scanning…" in the UI until this hits /api/cron/poll-virus-scans.
+on:
+  schedule:
+    - cron: "*/10 * * * *" # every 10 minutes
+  workflow_dispatch: {}
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call poll-virus-scans endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          TOKEN=$(printf '%s' "cron:poll-virus-scans" | openssl dgst -sha256 -hmac "$CRON_SECRET" -r | awk '{print $1}')
+          curl -sf -X GET "https://cloud.bongshai.com/api/cron/poll-virus-scans" \
+            -H "x-cron-token: $TOKEN" \
+            -o response.json -w "HTTP %{http_code}\n"
+          cat response.json

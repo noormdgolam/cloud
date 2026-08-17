@@ -24,3 +24,10 @@ export function ownsRecord(
     ? record.userId === identity.userId
     : record.anonymousSessionId === identity.anonymousSessionId;
 }
+
+export function ownerWhere(identity: Identity) {
+  return "userId" in identity
+    ? { userId: identity.userId }
+    : { anonymousSessionId: identity.anonymousSessionId };
+}
+

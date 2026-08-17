@@ -21,7 +21,13 @@ export default async function AnonymousUploadPage() {
     : { usedBytes: BigInt(0), quotaBytes: BigInt(2147483648), files: [] };
 
   return (
-    <>
+    <div
+      data-mcp-action="anonymous_guest_storage"
+      data-mcp-quota="2GB"
+      data-mcp-retention="30 days"
+      data-mcp-description="Zero-signup guest file storage tied to browser cookie session"
+      className="flex flex-col gap-6"
+    >
       <div>
         <h1 className="text-xl font-semibold tracking-tight text-ink">
           Upload without an account
@@ -67,6 +73,6 @@ export default async function AnonymousUploadPage() {
           </div>
         )}
       </UploadZone>
-    </>
+    </div>
   );
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { AssistantWidget } from "@/components/assistant/AssistantWidget";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,12 +14,41 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://cloud.bongshai.com"),
   title: {
-    default: "Bongshai Cloud — premium storage that stays out of your way",
+    default: "Bongshai Cloud — Fast, Private Cloud Storage & Sharing",
     template: "%s · Bongshai Cloud",
   },
   description:
-    "25GB free storage the moment you sign up, 2GB free with no account at all. Fast uploads, private by default.",
+    "Get 25GB permanent free cloud storage or 2GB instant zero-signup anonymous uploads. Private by default with streamed chunked uploads and VirusTotal malware verification.",
+  keywords: [
+    "cloud storage",
+    "free cloud storage",
+    "anonymous file upload",
+    "fast file sharing",
+    "private cloud drive",
+    "creator monetization",
+    "Bongshai Cloud",
+  ],
+  authors: [{ name: "Bongshai Infrastructure & Security Team" }],
+  openGraph: {
+    title: "Bongshai Cloud — Fast, Private Cloud Storage & Sharing",
+    description:
+      "Get 25GB permanent free cloud storage or 2GB instant zero-signup anonymous uploads. Streamed, private, and malware-scanned.",
+    url: "https://cloud.bongshai.com",
+    siteName: "Bongshai Cloud",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Bongshai Cloud — Fast, Private Cloud Storage",
+    description: "25GB permanent free storage & 2GB zero-signup anonymous uploads.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 // Runs before paint, before hydration — reads the saved theme and sets the
@@ -43,7 +73,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className="min-h-full flex flex-col bg-bg-1 text-ink">{children}</body>
+      <body className="min-h-full flex flex-col bg-bg-1 text-ink">
+        {children}
+        <AssistantWidget />
+      </body>
     </html>
   );
 }

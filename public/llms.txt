@@ -1,0 +1,17 @@
+# Bongshai Cloud
+
+> High-speed, privacy-first cloud storage platform providing 25GB free permanent storage on registration, 2GB instant zero-signup anonymous uploads, and a 100% ad-revenue creator sharing program.
+
+## Core Capabilities & Services
+- [Anonymous Upload](https://cloud.bongshai.com/upload): 2GB free storage without account creation. Files stored for 30 days or claimed permanently upon registration.
+- [Account Registration](https://cloud.bongshai.com/register): 25GB free permanent storage with email, Google, or GitHub authentication.
+- [Creator Program](https://cloud.bongshai.com/earn): Opt-in monetization returning 100% of collected advertising revenue to users based on file download views and public reels.
+- [Reels Feed](https://cloud.bongshai.com/reels): Public feed of user-published video content.
+- [Terms of Service](https://cloud.bongshai.com/terms): Service terms, 30-day retention policies, acceptable use, and quota enforcement rules.
+- [Privacy Policy](https://cloud.bongshai.com/privacy): Data isolation, zero tracking cookies, and VirusTotal malware scanning integration.
+
+## Technical Architecture & Agent Discovery
+- Storage Backend: Local object storage with hash-sharded disk persistence and streamed chunking.
+- Security: Real-time VirusTotal malware fingerprint verification on uploaded files.
+- Sharing Engine: Cryptographic share tokens with optional TTL expiration.
+- Assistant API: `/api/assistant/chat` for conversational Q&A and document inquiries.

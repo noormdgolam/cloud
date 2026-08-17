@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { deleteStoredFile } from "@/lib/storage";
+import { adjustOwnerUsedBytes } from "@/lib/quota";
 import { adminResetPasswordSchema } from "@/lib/validators";
 import type { FormState } from "./auth-actions";
 
@@ -57,14 +58,7 @@ export async function adminDeleteFile(fileId: string) {
   if (!file) return;
 
   await prisma.$transaction(async (tx) => {
-    if (file.userId) {
-      await tx.user.update({ where: { id: file.userId }, data: { usedBytes: { decrement: file.size } } });
-    } else if (file.anonymousSessionId) {
-      await tx.anonymousSession.update({
-        where: { id: file.anonymousSessionId },
-        data: { usedBytes: { decrement: file.size } },
-      });
-    }
+    await adjustOwnerUsedBytes(tx, file, -file.size);
     await tx.file.delete({ where: { id: fileId } });
   });
 
@@ -73,4 +67,37 @@ export async function adminDeleteFile(fileId: string) {
   });
 
   revalidatePath(file.userId ? `/backstage/users/${file.userId}` : "/backstage/anonymous");
+}
+
+// Manually records a creator-earnings ledger entry and keeps
+// User.creatorBalancePoisha in sync — CREDIT for a real ad-revenue share
+// distribution, PAYOUT for recording money actually sent. Never automatic.
+export async function addCreatorLedgerEntry(userId: string, formData: FormData) {
+  await requireAdmin();
+
+  const type = formData.get("type") === "PAYOUT" ? "PAYOUT" : "CREDIT";
+  const amountBdt = Number(formData.get("amountBdt"));
+  if (!Number.isFinite(amountBdt) || amountBdt <= 0) {
+    throw new Error("Enter a positive amount.");
+  }
+  const amountPoisha = Math.round(amountBdt * 100);
+  const note = String(formData.get("note") ?? "").trim().slice(0, 500) || null;
+
+  await prisma.$transaction(async (tx) => {
+    if (type === "PAYOUT") {
+      // creatorBalancePoisha >= amountPoisha baked into the update's own
+      // where clause — atomic with the decrement, so a fat-fingered or
+      // concurrent payout can never push the balance negative.
+      const { count } = await tx.user.updateMany({
+        where: { id: userId, creatorBalancePoisha: { gte: amountPoisha } },
+        data: { creatorBalancePoisha: { decrement: amountPoisha } },
+      });
+      if (count === 0) throw new Error("Payout exceeds this creator's current balance.");
+    } else {
+      await tx.user.update({ where: { id: userId }, data: { creatorBalancePoisha: { increment: amountPoisha } } });
+    }
+    await tx.creatorLedgerEntry.create({ data: { userId, type, amountPoisha, note } });
+  });
+
+  revalidatePath(`/backstage/users/${userId}`);
 }

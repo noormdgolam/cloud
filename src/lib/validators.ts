@@ -39,3 +39,19 @@ export const passwordChangeSchema = z
 export const adminResetPasswordSchema = z.object({
   newPassword: newPasswordField,
 });
+
+export const forgotPasswordSchema = z.object({
+  email: z.email("Enter a valid email address.").trim().toLowerCase(),
+});
+
+export const resetPasswordSchema = z
+  .object({
+    email: z.email("Enter a valid email address.").trim().toLowerCase(),
+    code: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit code."),
+    newPassword: newPasswordField,
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "New passwords don't match.",
+    path: ["confirmPassword"],
+  });

@@ -7,8 +7,9 @@ import { mimeIcon } from "@/lib/mime-icon";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { toggleUnlimited, toggleAdmin, adminDeleteFile } from "@/lib/actions/admin-actions";
+import { toggleUnlimited, toggleAdmin, adminDeleteFile, addCreatorLedgerEntry } from "@/lib/actions/admin-actions";
 import { AdminResetPasswordForm } from "@/components/backstage/AdminResetPasswordForm";
+import { Input } from "@/components/ui/Input";
 
 export const metadata = { title: "Backstage — User" };
 
@@ -22,19 +23,26 @@ export default async function BackstageUserDetail({
   const user = await prisma.user.findUnique({
     where: { id },
     include: {
+      // Every recoverable status — including files the user has trashed or
+      // "deleted forever", which are only ever PURGED (hidden from them),
+      // never actually removed. A superuser can still see and pull all of it.
       files: {
-        where: { status: "COMMITTED" },
+        where: { status: { in: ["COMMITTED", "DELETED", "PURGED"] } },
         orderBy: { createdAt: "desc" },
         include: { folder: { select: { name: true } } },
       },
+      creatorLedger: { orderBy: { createdAt: "desc" }, take: 10 },
       _count: { select: { folders: true } },
     },
   });
 
   if (!user) notFound();
 
+  const committedCount = user.files.filter((f) => f.status === "COMMITTED").length;
+  const totalViews = user.files.reduce((sum, f) => sum + f.viewCount, BigInt(0));
   const toggleUnlimitedAction = toggleUnlimited.bind(null, user.id, user.quotaBytes !== null);
   const toggleAdminAction = toggleAdmin.bind(null, user.id, !user.isAdmin);
+  const addLedgerAction = addCreatorLedgerEntry.bind(null, user.id);
 
   return (
     <div className="flex flex-col gap-6">
@@ -53,7 +61,7 @@ export default async function BackstageUserDetail({
             <p className="mt-1 text-sm text-ink-muted">{user.email}</p>
             <p className="mt-3 font-mono text-xs text-ink-faint">
               {formatBytes(user.usedBytes)} used of{" "}
-              {user.quotaBytes === null ? "unlimited" : formatBytes(user.quotaBytes)} · {user.files.length}{" "}
+              {user.quotaBytes === null ? "unlimited" : formatBytes(user.quotaBytes)} · {committedCount}{" "}
               files · {user._count.folders} folders · joined {formatRelativeDate(user.createdAt)}
             </p>
           </div>
@@ -84,9 +92,67 @@ export default async function BackstageUserDetail({
         </GlassCard>
       )}
 
+      <GlassCard className="p-5">
+        <h2 className="text-sm font-semibold text-ink">Creator earnings</h2>
+        <p className="mt-1 font-mono text-xs text-ink-faint">
+          {totalViews.toLocaleString()} total views · balance ৳{(user.creatorBalancePoisha / 100).toFixed(2)}
+        </p>
+
+        <form action={addLedgerAction} className="mt-4 flex flex-wrap items-end gap-2">
+          <div>
+            <label className="mb-1 block text-xs text-ink-muted" htmlFor="type">
+              Type
+            </label>
+            <select
+              id="type"
+              name="type"
+              className="rounded-lg border border-border bg-bg-2 px-2.5 py-2 text-sm text-ink"
+            >
+              <option value="CREDIT">Credit (earned)</option>
+              <option value="PAYOUT">Payout (sent)</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-ink-muted" htmlFor="amountBdt">
+              Amount (৳)
+            </label>
+            <Input id="amountBdt" name="amountBdt" type="number" min="0.01" step="0.01" required className="w-28" />
+          </div>
+          <div className="min-w-[10rem] flex-1">
+            <label className="mb-1 block text-xs text-ink-muted" htmlFor="note">
+              Note
+            </label>
+            <Input id="note" name="note" placeholder="e.g. Adsterra Jan 2026, pro-rata share" />
+          </div>
+          <Button type="submit" variant="ghost" className="px-4 py-2 text-xs">
+            Add entry
+          </Button>
+        </form>
+
+        {user.creatorLedger.length > 0 && (
+          <div className="mt-4 flex flex-col gap-0.5 border-t border-border pt-3">
+            {user.creatorLedger.map((entry) => (
+              <div key={entry.id} className="flex items-center justify-between gap-3 py-1.5 text-xs">
+                <span className="min-w-0 flex-1 truncate text-ink-muted">
+                  {entry.type === "CREDIT" ? "Credit" : "Payout"}
+                  {entry.note ? ` — ${entry.note}` : ""} · {formatRelativeDate(entry.createdAt)}
+                </span>
+                <span className={`shrink-0 font-mono ${entry.type === "CREDIT" ? "text-accent" : "text-ink-faint"}`}>
+                  {entry.type === "CREDIT" ? "+" : "-"}৳{(entry.amountPoisha / 100).toFixed(2)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </GlassCard>
+
       <GlassCard className="p-0">
         <div className="border-b border-border p-4">
           <h2 className="text-sm font-semibold text-ink">Files</h2>
+          <p className="mt-0.5 text-xs text-ink-faint">
+            Includes files this user has trashed or &quot;deleted forever&quot; — those are never actually
+            removed, only hidden from them.
+          </p>
         </div>
         {user.files.length === 0 ? (
           <p className="p-6 text-center text-sm text-ink-faint">No files.</p>
@@ -101,7 +167,15 @@ export default async function BackstageUserDetail({
                   {mimeIcon(file.mimeType, "size-4 text-ink-muted")}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm text-ink">{file.originalName}</span>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-sm text-ink">{file.originalName}</span>
+                    {file.status === "DELETED" && (
+                      <Badge className="shrink-0 border-warning/40 text-warning">trashed</Badge>
+                    )}
+                    {file.status === "PURGED" && (
+                      <Badge className="shrink-0 border-danger/40 text-danger">purged</Badge>
+                    )}
+                  </span>
                   <span className="block text-xs text-ink-faint">
                     {file.folder?.name ?? "Root"} · {formatRelativeDate(file.createdAt)}
                   </span>

@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Copy, Link2 } from "lucide-react";
+import { Check, Copy, Link2, Lock } from "lucide-react";
 import { createShareLink, getActiveShareLink, revokeShareLink } from "@/lib/actions/share-actions";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 
-type Link = { id: string; token: string; expiresAt: Date | null };
+type Link = { id: string; token: string; expiresAt: Date | null; hasPassword: boolean };
 
 export function ShareDialog({
   fileId,
@@ -22,6 +22,7 @@ export function ShareDialog({
   // undefined = not fetched yet, null = fetched and no active link exists.
   const [link, setLink] = useState<Link | null | undefined>(undefined);
   const [expiresInDays, setExpiresInDays] = useState<string>("7");
+  const [password, setPassword] = useState("");
   const [copied, setCopied] = useState(false);
   const loading = open && link === undefined;
 
@@ -62,10 +63,20 @@ export function ShareDialog({
                 {copied ? <Check className="size-3.5 text-success" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
               </button>
             </div>
-            {link.expiresAt && (
-              <p className="text-xs text-ink-faint">
-                Expires {link.expiresAt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
-              </p>
+            {(link.expiresAt || link.hasPassword) && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-faint">
+                {link.expiresAt && (
+                  <span>
+                    Expires {link.expiresAt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                  </span>
+                )}
+                {link.hasPassword && (
+                  <span className="flex items-center gap-1">
+                    <Lock className="size-3" aria-hidden />
+                    Password protected
+                  </span>
+                )}
+              </div>
             )}
             <Button
               type="button"
@@ -94,6 +105,21 @@ export function ShareDialog({
                 <option value="0">Never</option>
               </select>
             </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-ink-muted">
+                Password <span className="text-ink-faint">(optional)</span>
+              </label>
+              <div className="flex items-center gap-2 rounded-xl border border-border bg-bg-2 px-3.5 py-2.5">
+                <Lock className="size-4 shrink-0 text-ink-faint" aria-hidden />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Leave blank for none"
+                  className="w-full min-w-0 bg-transparent text-sm text-ink placeholder:text-ink-faint focus:outline-none"
+                />
+              </div>
+            </div>
             <Button
               type="button"
               variant="accent"
@@ -102,6 +128,7 @@ export function ShareDialog({
                 const created = await createShareLink(fileId, {
                   expiresInDays: expiresInDays === "0" ? null : Number(expiresInDays),
                   maxDownloads: null,
+                  password: password || null,
                 });
                 setLink(created);
               }}

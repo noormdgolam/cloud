@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createFileReadStream } from "@/lib/storage";
 import { checkRateLimit, getClientIp, RateLimitExceededError } from "@/lib/rate-limit";
+import { shareCookieName, verifyShareAccess } from "@/lib/share-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +43,18 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/s/[token
   }
   if (link.file.status !== "COMMITTED") {
     return NextResponse.json({ error: "File not available." }, { status: 404 });
+  }
+  if (link.file.scanStatus === "INFECTED") {
+    return NextResponse.json(
+      { error: "This file was flagged as malicious by a virus scan and can't be downloaded." },
+      { status: 403 }
+    );
+  }
+  if (link.passwordHash) {
+    const cookieValue = request.cookies.get(shareCookieName(token))?.value;
+    if (!verifyShareAccess(token, cookieValue)) {
+      return NextResponse.json({ error: "Password required.", passwordRequired: true }, { status: 401 });
+    }
   }
 
   const file = link.file;

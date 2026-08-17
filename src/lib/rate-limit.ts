@@ -8,6 +8,12 @@ export class RateLimitExceededError extends Error {
   }
 }
 
+// The DB is remote with real network latency (see quota.ts's TX_OPTIONS for
+// the same reasoning) — Prisma's ~5s default interactive-transaction
+// timeout is tight under concurrency and was observed failing for real
+// under a burst of near-simultaneous requests from the same identity.
+const TX_OPTIONS = { maxWait: 10_000, timeout: 15_000 };
+
 /**
  * Fixed-window counter backed by the DB (not an in-memory Map) so it holds
  * up correctly if this ever runs as more than one process — a single
@@ -44,7 +50,7 @@ export async function checkRateLimit(
       where: { key },
       data: { count: { increment: 1 } },
     });
-  });
+  }, TX_OPTIONS);
 }
 
 /** Best-effort real client IP behind Apache/a reverse proxy in production. */

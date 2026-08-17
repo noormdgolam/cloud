@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createFileReadStream } from "@/lib/storage";
+import { isPreviewableServerSide } from "@/lib/mime-preview";
 import { ANON_HEADER_NAME } from "@/proxy";
 
 export const runtime = "nodejs";
@@ -27,18 +28,24 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/files/[i
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
+  if (file.scanStatus === "INFECTED") {
+    return NextResponse.json(
+      { error: "This file was flagged as malicious by a virus scan and can't be downloaded." },
+      { status: 403 }
+    );
+  }
+
   const totalSize = Number(file.size);
   const rangeHeader = request.headers.get("range");
 
   // Inline viewing is only ever honored for types that can't carry an
   // active-content risk when rendered directly in this origin — SVG is
   // deliberately excluded from "image/*" since it can embed scripts, and
-  // there's no CSP here to sandbox that. Checked server-side (not just
-  // hidden in the UI) so requesting ?inline=1 on a disallowed type can't
-  // bypass it.
-  const previewable =
-    (file.mimeType.startsWith("image/") && file.mimeType !== "image/svg+xml") ||
-    file.mimeType === "application/pdf";
+  // there's no CSP here to sandbox that. text/* is served inline as plain
+  // text (browsers don't execute text/plain), never text/html. Checked
+  // server-side (not just hidden in the UI) so requesting ?inline=1 on a
+  // disallowed type can't bypass it.
+  const previewable = isPreviewableServerSide(file.mimeType);
   const wantsInline = request.nextUrl.searchParams.get("inline") === "1" && previewable;
 
   const headers = new Headers({

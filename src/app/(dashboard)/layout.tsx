@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Sidebar, MobileNav } from "@/components/dashboard/Sidebar";
+import { CommandPalette } from "@/components/dashboard/CommandPalette";
+import { ShortcutsHelp } from "@/components/dashboard/ShortcutsHelp";
 
 export default async function DashboardLayout({ children }: LayoutProps<"/">) {
   const session = await auth();
@@ -33,6 +35,8 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
         quotaBytes={user.quotaBytes}
       />
       <main className="min-w-0 flex-1 py-2">{children}</main>
+      <CommandPalette />
+      <ShortcutsHelp />
     </div>
   );
 }

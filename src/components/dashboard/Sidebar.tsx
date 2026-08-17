@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Cloud, FolderOpen, LogOut, Menu, Search, Settings } from "lucide-react";
+import { Cloud, Crown, FolderOpen, Link2, LogOut, Menu, Search, Settings, Trash2, Wrench } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { signOutAction } from "@/lib/actions/auth-actions";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/Dialog";
@@ -39,6 +39,10 @@ function SidebarBody({
   const initial = (userName ?? userEmail).charAt(0).toUpperCase();
   const pathname = usePathname();
   const onSettings = pathname === "/settings";
+  const onTrash = pathname === "/trash";
+  const onTools = pathname === "/tools";
+  const onBilling = pathname === "/settings/billing";
+  const onRequests = pathname === "/requests";
 
   return (
     <>
@@ -52,9 +56,12 @@ function SidebarBody({
             name="q"
             type="search"
             placeholder="Search files…"
-            className="py-2 pl-8 text-sm"
+            className="py-2 pl-8 pr-12 text-sm"
             aria-label="Search files"
           />
+          <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-border px-1.5 py-0.5 font-mono text-[0.65rem] text-ink-faint sm:block">
+            ⌘K
+          </kbd>
         </div>
       </form>
 
@@ -64,11 +71,55 @@ function SidebarBody({
           onClick={onNavigate}
           className={cn(
             "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-ink",
-            !onSettings && "bg-[var(--glass-surface)]"
+            !onSettings && !onTrash && !onTools && !onBilling && !onRequests && "bg-[var(--glass-surface)]"
           )}
         >
           <FolderOpen className="size-4 text-accent" strokeWidth={1.75} aria-hidden />
           My files
+        </Link>
+        <Link
+          href="/settings/billing"
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-ink",
+            onBilling && "bg-[var(--glass-surface)]"
+          )}
+        >
+          <Crown className="size-4 text-accent-2" strokeWidth={1.75} aria-hidden />
+          Storage plan
+        </Link>
+        <Link
+          href="/tools"
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-ink",
+            onTools && "bg-[var(--glass-surface)]"
+          )}
+        >
+          <Wrench className="size-4 text-ink-muted" strokeWidth={1.75} aria-hidden />
+          Tools
+        </Link>
+        <Link
+          href="/requests"
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-ink",
+            onRequests && "bg-[var(--glass-surface)]"
+          )}
+        >
+          <Link2 className="size-4 text-ink-muted" strokeWidth={1.75} aria-hidden />
+          File requests
+        </Link>
+        <Link
+          href="/trash"
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-ink",
+            onTrash && "bg-[var(--glass-surface)]"
+          )}
+        >
+          <Trash2 className="size-4 text-ink-muted" strokeWidth={1.75} aria-hidden />
+          Trash
         </Link>
         <Link
           href="/settings"
@@ -138,7 +189,7 @@ export function MobileNav(props: SidebarProps) {
             <Menu className="size-5" aria-hidden />
           </button>
         </DialogTrigger>
-        <DialogContent title="Menu" className="flex max-h-[80vh] flex-col p-4">
+        <DialogContent title="Menu" className="flex max-h-[80dvh] flex-col p-4">
           <SidebarBody {...props} onNavigate={() => setOpen(false)} />
         </DialogContent>
       </Dialog>

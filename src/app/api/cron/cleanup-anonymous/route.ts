@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { cleanupAnonymousFiles } from "@/lib/cleanup";
+import { cleanupAnonymousFiles, purgeOldTrash } from "@/lib/cleanup";
+import { expireSubscriptions } from "@/lib/billing/expire-subscriptions";
 import { verifyCronToken } from "@/lib/cron-auth";
 
 export const runtime = "nodejs";
@@ -15,6 +16,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await cleanupAnonymousFiles(30);
-  return NextResponse.json(result);
+  // Runs alongside the anonymous-file sweep in the same scheduled hit
+  // rather than needing its own separate cron trigger configured.
+  // allSettled (not all) — these three jobs are independent, and one
+  // throwing shouldn't hide whether the other two actually succeeded, nor
+  // turn the whole hit into an opaque 500 for a problem in just one of them.
+  const [anonymous, trash, subscriptions] = await Promise.allSettled([
+    cleanupAnonymousFiles(30),
+    purgeOldTrash(30),
+    expireSubscriptions(),
+  ]);
+  const summarize = (r: PromiseSettledResult<unknown>) => (r.status === "fulfilled" ? r.value : { error: String(r.reason) });
+  const anyFailed = [anonymous, trash, subscriptions].some((r) => r.status === "rejected");
+
+  return NextResponse.json(
+    { anonymous: summarize(anonymous), trash: summarize(trash), subscriptions: summarize(subscriptions) },
+    { status: anyFailed ? 500 : 200 }
+  );
 }

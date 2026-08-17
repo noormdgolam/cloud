@@ -13,6 +13,14 @@ export function formatBytes(value: bigint | number): string {
   return `${bytes.toFixed(precision)} ${UNITS[unitIndex]}`;
 }
 
+// amount is the smallest currency unit (cents for USD, poisha for BDT) —
+// matches how Payment/AddonPurchase store it.
+export function formatCurrency(amount: number, currency: string): string {
+  if (currency === "USD") return `$${(amount / 100).toFixed(2)}`;
+  if (currency === "BDT") return `৳${(amount / 100).toFixed(0)}`;
+  return `${(amount / 100).toFixed(2)} ${currency}`;
+}
+
 export function formatRelativeDate(date: Date): string {
   const diffMs = Date.now() - date.getTime();
   const diffMinutes = Math.round(diffMs / 60_000);

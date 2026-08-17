@@ -17,7 +17,10 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/backstag
 
   const { id } = await ctx.params;
   const file = await prisma.file.findUnique({ where: { id } });
-  if (!file || file.status !== "COMMITTED") {
+  // RESERVED means the upload never finished — nothing real on disk yet.
+  // COMMITTED/DELETED/PURGED all have real bytes on disk, and an admin can
+  // pull any of them regardless of what the owning user sees.
+  if (!file || file.status === "RESERVED") {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 

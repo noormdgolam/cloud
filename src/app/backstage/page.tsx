@@ -169,9 +169,14 @@ export default async function BackstageOverview({
         )}
       </GlassCard>
 
-      <Link href="/backstage/anonymous" className="text-sm text-ink-muted hover:text-ink">
-        View anonymous sessions →
-      </Link>
+      <div className="flex gap-4">
+        <Link href="/backstage/anonymous" className="text-sm text-ink-muted hover:text-ink">
+          View anonymous sessions →
+        </Link>
+        <Link href="/backstage/revenue" className="text-sm text-ink-muted hover:text-ink">
+          View revenue →
+        </Link>
+      </div>
     </div>
   );
 }

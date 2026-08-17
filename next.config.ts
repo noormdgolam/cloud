@@ -11,6 +11,13 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // nodemailer does internal dynamic requires that Next's output file
+  // tracing can't statically follow, so it's silently dropped from the
+  // standalone bundle's node_modules without this — confirmed missing via
+  // `find .next/standalone -iname "*nodemailer*"` turning up nothing.
+  outputFileTracingIncludes: {
+    "/*": ["./node_modules/nodemailer/**/*"],
+  },
   experimental: {
     // Every request (including /api/upload) passes through proxy.ts for the
     // anonymous-session header — Next.js caps request bodies through that
@@ -24,6 +31,16 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         headers: securityHeaders,
+      },
+      // PreviewDialog's PDF fallback embeds this same-origin route in an
+      // <iframe> — X-Frame-Options: DENY (from the blanket rule above)
+      // blocks that too, not just cross-origin framing, so the PDF preview
+      // shows "refused to connect". SAMEORIGIN still blocks any other site
+      // from framing this route (the actual clickjacking risk); it just
+      // stops blocking the app from framing its own content.
+      {
+        source: "/api/files/:id/download",
+        headers: securityHeaders.map((h) => (h.key === "X-Frame-Options" ? { key: h.key, value: "SAMEORIGIN" } : h)),
       },
     ];
   },

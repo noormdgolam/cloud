@@ -6,11 +6,20 @@ import { LoginForm } from "@/components/auth/LoginForm";
 
 export const metadata: Metadata = { title: "Sign in" };
 
-export default function LoginPage() {
+export default async function LoginPage(props: PageProps<"/login">) {
+  const searchParams = await props.searchParams;
+  const reset = searchParams.reset === "1";
+
   return (
     <GlassCard className="p-7 sm:p-8">
       <h1 className="text-xl font-semibold tracking-tight text-ink">Welcome back</h1>
       <p className="mt-1.5 text-sm text-ink-muted">Sign in to your 25GB.</p>
+
+      {reset && (
+        <p className="mt-4 rounded-lg border border-accent/30 bg-accent/10 px-3 py-2.5 text-sm text-ink">
+          Password reset — sign in with your new password.
+        </p>
+      )}
 
       <div className="mt-6">
         <OAuthButtons />

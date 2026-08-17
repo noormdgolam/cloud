@@ -43,6 +43,7 @@ export default async function DashboardPage({
         folders={contents.folders}
         files={contents.files}
         sort={sortOption}
+        googleImportEligible
       />
     </>
   );

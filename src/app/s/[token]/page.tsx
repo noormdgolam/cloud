@@ -1,10 +1,22 @@
 import type { Metadata } from "next";
+import { cookies, headers } from "next/headers";
 import { Cloud, Download } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatBytes } from "@/lib/format";
 import { mimeIcon } from "@/lib/mime-icon";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { LinkButton } from "@/components/ui/Button";
+import { SharePasswordForm } from "@/components/dashboard/SharePasswordForm";
+import { shareCookieName, verifyShareAccess } from "@/lib/share-auth";
+import { recordFileView } from "@/lib/file-views";
+import { AdSlot } from "@/components/ads/AdSlot";
+
+async function getRequestIp(): Promise<string> {
+  const h = await headers();
+  const forwardedFor = h.get("x-forwarded-for");
+  if (forwardedFor) return forwardedFor.split(",")[0].trim();
+  return h.get("x-real-ip") ?? "unknown";
+}
 
 export const metadata: Metadata = { title: "Shared file" };
 
@@ -25,7 +37,10 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 export default async function SharePage(props: PageProps<"/s/[token]">) {
   const { token } = await props.params;
-  const link = await prisma.shareLink.findUnique({ where: { token }, include: { file: true } });
+  const link = await prisma.shareLink.findUnique({
+    where: { token },
+    include: { file: { include: { user: { select: { creatorProgramEnabled: true } } } } },
+  });
 
   const unavailable = (message: string) => (
     <Shell>
@@ -41,9 +56,44 @@ export default async function SharePage(props: PageProps<"/s/[token]">) {
     return unavailable("This link has reached its download limit.");
   }
   if (link.file.status !== "COMMITTED") return unavailable("File not available.");
+  if (link.file.scanStatus === "INFECTED") {
+    return unavailable("This file was flagged as malicious by a virus scan and can't be shared.");
+  }
+
+  // Counts toward the creator-earnings program — a real page load where an
+  // ad impression would render, dedup-gated so refreshes don't inflate it.
+  void recordFileView(link.file.id, await getRequestIp());
+
+  // Ads only ever render for files owned by a user who has explicitly
+  // opted into the creator-earnings program — never for a plain free
+  // account, a paying subscriber, or an anonymous upload (no user at all).
+  const showAds = link.file.user?.creatorProgramEnabled === true;
+
+  if (link.passwordHash) {
+    const jar = await cookies();
+    const unlocked = verifyShareAccess(token, jar.get(shareCookieName(token))?.value);
+    if (!unlocked) {
+      return (
+        <Shell>
+          {showAds && <AdSlot />}
+          <GlassCard className="flex flex-col items-center p-7 text-center sm:p-8">
+            <span className="flex size-14 items-center justify-center rounded-2xl border border-border bg-bg-2">
+              {mimeIcon(link.file.mimeType, "size-6 text-accent-2")}
+            </span>
+            <p className="mt-4 max-w-full truncate text-base font-medium text-ink">
+              {link.file.originalName}
+            </p>
+            <p className="mt-1 text-xs text-ink-faint">This file is password protected</p>
+            <SharePasswordForm token={token} />
+          </GlassCard>
+        </Shell>
+      );
+    }
+  }
 
   return (
     <Shell>
+      {showAds && <AdSlot />}
       <GlassCard className="flex flex-col items-center p-7 text-center sm:p-8">
         <span className="flex size-14 items-center justify-center rounded-2xl border border-border bg-bg-2">
           {mimeIcon(link.file.mimeType, "size-6 text-accent-2")}

@@ -1,0 +1,34 @@
+# Bongshai Cloud — Complete Technical & Platform Guide
+
+## 1. Overview & Positioning
+Bongshai Cloud is a privacy-first cloud storage and sharing ecosystem. It offers two primary tiers:
+1. **Anonymous Tier (2GB)**: Zero-registration storage tied to browser cookie sessions. Retained for 30 days unless claimed.
+2. **Registered Tier (25GB)**: Permanent free quota accessible via email/password, Google OAuth, or GitHub OAuth.
+
+## 2. Key Architecture & Features
+
+### Streamed Chunked Uploads
+Files are streamed directly to disk storage using busboy stream parsing. Uploads avoid memory bloat and write to hash-partitioned storage shards immediately.
+
+### Security & Malware Verification
+- Uploaded files are checked against VirusTotal hash fingerprints.
+- Confirmed malicious payloads are blocked from distribution.
+- Files live in private, unguessable storage buckets unreachable by direct URL scraping.
+
+### Creator Monetization Program
+- 100% of collected advertising revenue generated from share link page views and `/reels` feed impressions is credited to creator accounts in Bangladeshi Taka (BDT / Poisha).
+- Balances can be tracked in real-time on `/earn` and paid out upon request.
+
+### AI WebMCP Integration
+Interactive components support `data-mcp-action` attributes enabling autonomous agents to execute file uploads, trigger query assistant requests, and manage settings.
+
+## 3. Route Index
+- `/`: Marketing landing page, platform FAQ, and live statistics.
+- `/upload`: Anonymous file drag-and-drop zone with storage meter.
+- `/register`: User account registration.
+- `/login`: Secure sign-in.
+- `/dashboard`: Authenticated file manager, folder explorer, and share controls.
+- `/earn`: Creator monetization dashboard and earnings ledger.
+- `/reels`: Public video stream.
+- `/terms`: Terms of Service.
+- `/privacy`: Privacy and compliance policy.

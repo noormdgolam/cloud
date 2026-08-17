@@ -1,12 +1,14 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { REFERRAL_COOKIE_NAME } from "@/lib/cookie-names";
 
 const protectedPrefixes = ["/dashboard", "/folder"];
-const authOnlyRoutes = ["/login", "/register"];
+const authOnlyRoutes = ["/login", "/register", "/forgot-password", "/reset-password"];
 
 export const ANON_COOKIE_NAME = "cloud_anon_id";
 export const ANON_HEADER_NAME = "x-anon-id";
+export { REFERRAL_COOKIE_NAME };
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
@@ -41,6 +43,21 @@ export default auth((req) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 60 * 60 * 24 * 365,
+      path: "/",
+    });
+  }
+
+  // A referral link (?ref=CODE) lands here on its way to /register or /login
+  // — stash it in a cookie so it survives the redirect to an OAuth provider
+  // and back, since query params don't. registerUser/events.createUser read
+  // this to attribute the signup.
+  const refParam = req.nextUrl.searchParams.get("ref");
+  if (refParam && /^[A-Z0-9]{4,12}$/i.test(refParam)) {
+    response.cookies.set(REFERRAL_COOKIE_NAME, refParam.toUpperCase(), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7,
       path: "/",
     });
   }

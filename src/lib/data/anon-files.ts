@@ -8,6 +8,7 @@ export async function getAnonymousFiles(anonId: string) {
     prisma.file.findMany({
       where: { anonymousSessionId: anonId, status: "COMMITTED" },
       orderBy: { createdAt: "desc" },
+      select: { id: true, originalName: true, size: true, mimeType: true, createdAt: true, folderId: true },
     }),
   ]);
 

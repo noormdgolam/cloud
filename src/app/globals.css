@@ -149,3 +149,83 @@ body {
     linear-gradient(to right, rgba(237, 240, 247, 0.05) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(237, 240, 247, 0.05) 1px, transparent 1px);
 }
+
+/*
+ * highlight.js class names mapped to the app's own theme tokens instead of
+ * a canned highlight.js theme file, so code preview stays correct in both
+ * light and dark rather than shipping a fixed-dark theme onto a light page.
+ */
+.hljs {
+  color: var(--ink);
+  background: transparent;
+}
+.hljs-comment,
+.hljs-quote {
+  color: var(--ink-faint);
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-tag {
+  color: var(--accent);
+}
+.hljs-string,
+.hljs-attr,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-addition {
+  color: var(--success);
+}
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet {
+  color: var(--accent-2);
+}
+.hljs-title,
+.hljs-section,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: var(--ink);
+  font-weight: 600;
+}
+.hljs-deletion {
+  color: var(--danger);
+}
+
+/* Shimmer and pulse micro-interactions */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    var(--ink) 0%,
+    var(--accent) 50%,
+    var(--ink) 100%
+  );
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: shimmer 6s ease infinite;
+}
+
+.glow-card {
+  position: relative;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.glow-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  box-shadow: 0 12px 30px -10px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+

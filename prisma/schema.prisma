@@ -11,8 +11,17 @@
 // under that ceiling.
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider      = "prisma-client"
+  output        = "../src/generated/prisma"
+  // Prisma bundles a ~5MB WASM query compiler for EVERY SQL dialect
+  // (postgresql/sqlite/sqlserver/cockroachdb) even though this project only
+  // ever uses MariaDB via @prisma/adapter-mariadb — there's currently no
+  // per-engine exclusion option (prisma/prisma#29095, acknowledged as a
+  // known limitation). "small" shrinks all five compiled builds together;
+  // it's the only lever available today. This mattered concretely: the
+  // ~50MB of dead-weight WASM files were the direct cause of repeated
+  // multi-minute FTP deploy stalls on this host.
+  compilerBuild = "small"
 }
 
 datasource db {
@@ -29,18 +38,60 @@ model User {
 
   usedBytes  BigInt  @default(0)
   quotaBytes BigInt? @default(26843545600) // 25 GiB; null = unlimited (superuser, granted manually)
+  // Permanent additive storage from referrals + addon-pack purchases, tracked
+  // separately from quotaBytes so activateSubscription can add it back in
+  // instead of clobbering it when a plan sets quotaBytes directly.
+  bonusBytes BigInt  @default(0)
 
   isAdmin Boolean @default(false) // grants access to /backstage — granted manually, never self-service
+
+  // Creator-earnings program: 100% of ad revenue attributable to this
+  // user's file views, in BDT poisha (matches Plan/Payment's currency
+  // convention). Only ever moved by an admin ledger entry — never
+  // computed/paid automatically, since real ad revenue isn't known in real time.
+  creatorBalancePoisha Int     @default(0)
+  // Explicit opt-in — ads only ever render on a share-link page when the
+  // FILE OWNER has this set. Off by default for every account (including
+  // paid plans and plain free accounts), so nobody sees an ad on a shared
+  // file unless they specifically chose to trade that for a revenue share.
+  creatorProgramEnabled Boolean @default(false)
+
+  referralCode String? @unique @db.VarChar(12) // lazily generated on first view of the referral card, not at signup
+  referredById String? @db.VarChar(30)
+  referredBy   User?   @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals    User[]  @relation("Referrals")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  accounts    Account[]
-  sessions    Session[]
-  files       File[]
-  folders     Folder[]
-  shareLinks  ShareLink[]
-  claimedFrom AnonymousSession[]
+  accounts           Account[]
+  sessions           Session[]
+  files              File[]
+  folders            Folder[]
+  shareLinks         ShareLink[]
+  claimedFrom        AnonymousSession[]
+  subscriptions      Subscription[]
+  payments           Payment[]
+  addonPurchases     AddonPurchase[]
+  passwordResetCodes PasswordResetCode[]
+  fileRequests       FileRequest[]
+  creatorLedger      CreatorLedgerEntry[]
+  reels              Reel[]
+}
+
+// Self-service "forgot password" flow — a short numeric code emailed to the
+// account, distinct from Auth.js's own VerificationToken (that one is shaped
+// for magic-link URLs, not a code the user types in).
+model PasswordResetCode {
+  id        String    @id @default(cuid()) @db.VarChar(30)
+  userId    String    @db.VarChar(30)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String    @db.VarChar(191)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 // Auth.js Prisma-adapter shape — field names must not deviate.
@@ -114,7 +165,8 @@ model Folder {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  files File[]
+  files        File[]
+  fileRequests FileRequest[]
 
   @@index([userId])
   @@index([anonymousSessionId])
@@ -125,6 +177,27 @@ enum FileStatus {
   RESERVED
   COMMITTED
   DELETED
+  // Terminal, user-facing "gone forever" state — set instead of an actual
+  // row/disk delete whenever a user empties trash or the 30-day auto-purge
+  // fires. The disk blob and DB row are deliberately kept: superusers can
+  // still browse and download PURGED files from /backstage, ordinary users
+  // never see them again (every user-facing query filters to COMMITTED or
+  // DELETED only).
+  PURGED
+}
+
+// PENDING: submitted to VirusTotal, awaiting analysis (poll-virus-scans.ts
+// resolves these). CLEAN/INFECTED: resolved verdict, from either an instant
+// hash-lookup match or a completed analysis. ERROR: VirusTotal call failed
+// (rate-limited, network, etc) — fails open, never blocks downloads. SKIPPED:
+// default for rows that existed before this feature shipped, and for files
+// too large to submit — never scanned, treated like CLEAN everywhere.
+enum FileScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  ERROR
+  SKIPPED
 }
 
 model File {
@@ -135,6 +208,15 @@ model File {
   size           BigInt // reconciled to real byte count post-upload
   status         FileStatus @default(RESERVED)
   checksumSha256 String?
+
+  // Malware scan (VirusTotal). Defaults to SKIPPED so the ALTER TABLE that
+  // adds this column doesn't retroactively queue every pre-existing file for
+  // scanning — commitQuota() explicitly sets PENDING for newly uploaded
+  // files going forward. scanAnalysisId is set only while a fresh (not
+  // hash-known) file is awaiting VirusTotal's async analysis result.
+  scanStatus     FileScanStatus @default(SKIPPED)
+  scanAnalysisId String?        @db.VarChar(191)
+  scanCheckedAt  DateTime?
 
   folderId String? @db.VarChar(30)
   folder   Folder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
@@ -149,10 +231,28 @@ model File {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  shareLinks ShareLink[]
+  // Dedup-gated count of share-link page loads (one per visitor per file
+  // per 24h — see FileViewDedup) — the basis for the creator-earnings
+  // program's per-file view stats.
+  viewCount BigInt @default(0)
+
+  shareLinks    ShareLink[]
+  requestUpload FileRequestUpload?
+  reel          Reel?
 
   @@index([userId, folderId, createdAt])
   @@index([anonymousSessionId, folderId, createdAt])
+}
+
+// One row per (file, visitor, day) that has already been counted toward
+// File.viewCount — presence = "don't increment again". Short-lived by
+// design (expiresAt), purged the same way stale upload reservations are:
+// opportunistically, not a hard requirement for correctness.
+model FileViewDedup {
+  key       String   @id @db.VarChar(191) // sha256(`${fileId}:${ip}`).slice(0, 40)
+  expiresAt DateTime
+
+  @@index([expiresAt])
 }
 
 model ShareLink {
@@ -166,6 +266,7 @@ model ShareLink {
   maxDownloads  Int?
   downloadCount Int       @default(0)
   revoked       Boolean   @default(false)
+  passwordHash  String?   @db.VarChar(191)
 
   createdByUserId String? @db.VarChar(30)
   createdByUser   User?   @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
@@ -178,8 +279,215 @@ model ShareLink {
   @@index([fileId])
 }
 
+enum CreatorLedgerType {
+  CREDIT // admin distributing a share of real, already-earned ad revenue
+  PAYOUT // admin recording that a balance was actually paid out (e.g. via bKash)
+}
+
+// Manually-entered ledger for the creator-earnings program — never written
+// by anything automatic. An admin adds a CREDIT after real ad revenue for a
+// period is known (distributed pro-rata by view share), and a PAYOUT once
+// they've actually sent the money. User.creatorBalancePoisha is the
+// running sum, kept in sync by whatever writes an entry here.
+model CreatorLedgerEntry {
+  id     String @id @default(cuid()) @db.VarChar(30)
+  userId String @db.VarChar(30)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type          CreatorLedgerType
+  amountPoisha  Int
+  note          String?           @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// A video file the owner has explicitly published to the public /reels
+// feed — publishing is a deliberate, per-file action (never automatic just
+// from uploading), and only ever available to a user who has already
+// opted into the creator-earnings program, since a reel's whole purpose is
+// generating ad-eligible views. Unpublishing sets published=false rather
+// than deleting the row, so the file itself is never touched either way.
+model Reel {
+  id     String @id @default(cuid()) @db.VarChar(30)
+  fileId String @unique @db.VarChar(30)
+  file   File   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  userId String @db.VarChar(30)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  caption   String? @db.VarChar(500)
+  published Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@index([published, createdAt])
+  @@index([userId])
+}
+
+// A shareable "drop a file for me" link — the reverse of ShareLink. Visiting
+// /request/[token] needs no account; anything they upload lands directly in
+// the REQUESTING user's own storage (via reserveQuota({userId}), same as any
+// other upload), counted against their quota, not a new anonymous session.
+model FileRequest {
+  id    String @id @default(cuid()) @db.VarChar(30)
+  token String @unique @db.VarChar(32)
+
+  userId String @db.VarChar(30)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title   String  @db.VarChar(191)
+  message String? @db.Text
+
+  folderId String? @db.VarChar(30)
+  folder   Folder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
+  expiresAt DateTime?
+  maxFiles  Int?
+  fileCount Int       @default(0)
+  revoked   Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+
+  uploads FileRequestUpload[]
+
+  @@index([userId])
+}
+
+model FileRequestUpload {
+  id        String      @id @default(cuid()) @db.VarChar(30)
+  requestId String      @db.VarChar(30)
+  request   FileRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fileId    String      @unique @db.VarChar(30)
+  file      File        @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  uploaderName String? @db.VarChar(191) // optional, self-reported — not an account
+
+  createdAt DateTime @default(now())
+
+  @@index([requestId])
+}
+
 model RateLimitBucket {
   key         String   @id @db.VarChar(191) // `${ip}:${route}`
   count       Int      @default(0)
   windowStart DateTime @default(now())
+}
+
+// Paid storage tiers. Row-per-plan rather than an enum so pricing/quota can
+// change without a migration — `active: false` retires a plan without
+// breaking historical Subscription/Payment rows that reference it.
+model Plan {
+  id             String  @id @db.VarChar(30) // stable slug, e.g. "plan_100gb"
+  name           String  @db.VarChar(100)
+  quotaBytes     BigInt
+  priceUsdCents  Int // canonical price, smallest USD unit
+  priceBdtPoisha Int // BDT price, smallest unit (1 BDT = 100 poisha) — set directly, not live-converted, so bKash checkout shows a clean round number
+  billingPeriodDays Int @default(30) // 30 = monthly, 365 = annual — activateSubscription extends by this, not a hardcoded month
+  active         Boolean @default(true)
+
+  subscriptions Subscription[]
+  payments      Payment[]
+
+  @@index([active])
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  EXPIRED
+  PAST_DUE
+}
+
+model Subscription {
+  id     String @id @default(cuid()) @db.VarChar(30)
+  userId String @db.VarChar(30)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId String @db.VarChar(30)
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  status           SubscriptionStatus @default(ACTIVE)
+  currentPeriodEnd DateTime // quota reverts to free tier if not renewed by this date
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payments Payment[]
+
+  @@index([userId])
+  @@index([status, currentPeriodEnd])
+}
+
+enum BillingProvider {
+  BKASH
+  NOWPAYMENTS
+  SSLCOMMERZ
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+model Payment {
+  id             String        @id @default(cuid()) @db.VarChar(30)
+  subscriptionId String?       @db.VarChar(30) // set once the subscription is created/renewed by this payment
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  userId         String        @db.VarChar(30)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId         String        @db.VarChar(30) // the plan this checkout was for — set at creation, before any subscription exists
+  plan           Plan          @relation(fields: [planId], references: [id])
+
+  provider    BillingProvider
+  providerRef String          @db.VarChar(191) // bKash paymentID, or NOWPayments payment_id
+  amount      Int // smallest currency unit (poisha for BDT, cents for USD)
+  currency    String          @db.VarChar(10) // "BDT" | "USD"
+  status      PaymentStatus   @default(PENDING)
+  rawPayload  String?         @db.Text // last known provider response — kept for support/dispute lookup, not parsed at runtime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, providerRef])
+  @@index([userId])
+}
+
+// One-time storage top-ups — deliberately NOT modeled as a Plan/Subscription
+// (those imply recurring monthly billing via activateSubscription). Kept as
+// its own parallel model + its own callback/webhook routes so this is purely
+// additive and can't regress the already-built recurring-plan checkout flow.
+model AddonPack {
+  id             String  @id @db.VarChar(30) // stable slug, e.g. "addon_100gb"
+  name           String  @db.VarChar(100)
+  bonusBytes     BigInt
+  priceUsdCents  Int
+  priceBdtPoisha Int
+  active         Boolean @default(true)
+
+  purchases AddonPurchase[]
+
+  @@index([active])
+}
+
+model AddonPurchase {
+  id     String    @id @default(cuid()) @db.VarChar(30)
+  userId String    @db.VarChar(30)
+  user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  packId String    @db.VarChar(30)
+  pack   AddonPack @relation(fields: [packId], references: [id])
+
+  provider    BillingProvider
+  providerRef String          @db.VarChar(191)
+  amount      Int
+  currency    String          @db.VarChar(10)
+  status      PaymentStatus   @default(PENDING)
+  rawPayload  String?         @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, providerRef])
+  @@index([userId])
 }

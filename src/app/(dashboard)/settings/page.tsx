@@ -1,10 +1,16 @@
 import { redirect } from "next/navigation";
+import { ChevronRight } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getStorageBreakdown } from "@/lib/data/storage-breakdown";
+import { getOrCreateReferralCode } from "@/lib/referral";
+import { siteUrl } from "@/lib/site-url";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { ProfileForm } from "@/components/dashboard/ProfileForm";
 import { PasswordForm } from "@/components/dashboard/PasswordForm";
 import { DeleteAccountDialog } from "@/components/dashboard/DeleteAccountDialog";
+import { StorageBreakdown } from "@/components/dashboard/StorageBreakdown";
+import { ReferralCard } from "@/components/dashboard/ReferralCard";
 
 export const metadata = { title: "Settings" };
 
@@ -17,6 +23,13 @@ export default async function SettingsPage() {
     select: { name: true, email: true, passwordHash: true },
   });
   if (!user) redirect("/login");
+
+  const [breakdown, referralCode, referralCount, bonus] = await Promise.all([
+    getStorageBreakdown(session.user.id),
+    getOrCreateReferralCode(session.user.id),
+    prisma.user.count({ where: { referredById: session.user.id } }),
+    prisma.user.findUnique({ where: { id: session.user.id }, select: { bonusBytes: true } }),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -44,6 +57,42 @@ export default async function SettingsPage() {
             This account signs in with Google or GitHub — there&apos;s no password to manage.
           </p>
         )}
+      </GlassCard>
+
+      <GlassCard className="p-5">
+        <h2 className="text-sm font-semibold text-ink">Storage breakdown</h2>
+        <p className="mt-1 text-sm text-ink-muted">What&apos;s using your space.</p>
+        <div className="mt-4">
+          <StorageBreakdown rows={breakdown} />
+        </div>
+      </GlassCard>
+
+      <GlassCard className="p-5">
+        <h2 className="text-sm font-semibold text-ink">Refer & earn</h2>
+        <p className="mt-1 text-sm text-ink-muted">
+          Share your link — you and your friend each get free bonus storage when they join.
+        </p>
+        <div className="mt-4">
+          <ReferralCard
+            code={referralCode}
+            referralCount={referralCount}
+            bonusBytes={bonus?.bonusBytes ?? BigInt(0)}
+            origin={siteUrl()}
+          />
+        </div>
+      </GlassCard>
+
+      <GlassCard className="p-0">
+        <a
+          href="/settings/billing"
+          className="flex items-center justify-between gap-3 p-5 hover:bg-[var(--glass-surface-hover)]"
+        >
+          <div>
+            <h2 className="text-sm font-semibold text-ink">Storage plan</h2>
+            <p className="mt-1 text-sm text-ink-muted">View or upgrade your storage.</p>
+          </div>
+          <ChevronRight className="size-4 shrink-0 text-ink-faint" aria-hidden />
+        </a>
       </GlassCard>
 
       <GlassCard className="border-danger/30 p-5">

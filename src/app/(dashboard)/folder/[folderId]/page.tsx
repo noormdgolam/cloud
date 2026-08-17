@@ -28,6 +28,7 @@ export default async function FolderPage(
       folders={contents.folders}
       files={contents.files}
       sort={sortOption}
+      googleImportEligible
     />
   );
 }
