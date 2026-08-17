@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Check, MoreHorizontal, Download, Pencil, Trash2, Share2, FolderInput, Wand2, FileOutput, RotateCw, Scissors, Stamp, ShieldOff, Minimize2, Sparkles, AudioLines, Clapperboard, ShieldAlert, Loader2, FileEdit } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { FileScanStatus } from "@/lib/data/browser";
@@ -29,7 +30,7 @@ import { XlsxEditorDialog } from "./XlsxEditorDialog";
 import { PdfOcrEditorDialog } from "./PdfOcrEditorDialog";
 import { useFileItemActions } from "./useFileItemActions";
 
-export function FileRow({
+export const FileRow = memo(function FileRow({
   id,
   name,
   size,
@@ -385,4 +386,5 @@ export function FileRow({
     </div>
     </>
   );
-}
+});
+
