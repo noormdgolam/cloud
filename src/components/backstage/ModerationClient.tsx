@@ -66,11 +66,11 @@ export function ModerationClient({
       setFeedback(
         `Scanned ${summary.scannedCount} images: ${summary.flagged} flagged, ${summary.safe} safe, ${summary.errors} errors.`
       );
-      router.refresh();
     } catch (err) {
       setFeedback(`Batch scan error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setScanningBatch(false);
+      router.refresh();
     }
   }
 
@@ -78,11 +78,11 @@ export function ModerationClient({
     setActiveScanId(fileId);
     try {
       await adminScanFileModeration(fileId);
-      router.refresh();
     } catch (err) {
       setFeedback(`Scan error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setActiveScanId(null);
+      router.refresh();
     }
   }
 

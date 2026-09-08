@@ -82,17 +82,21 @@ export async function addCreatorLedgerEntry(userId: string, formData: FormData) 
 export async function adminScanFileModeration(fileId: string) {
   await requireAdmin();
   const { scanImageForAdultContent } = await import("@/lib/moderation/vision-moderator");
-  const result = await scanImageForAdultContent(fileId);
-  revalidatePath("/backstage/moderation");
-  return result;
+  try {
+    return await scanImageForAdultContent(fileId);
+  } finally {
+    revalidatePath("/backstage/moderation");
+  }
 }
 
 export async function adminScanBatchModeration(limit = 10) {
   await requireAdmin();
   const { scanBatchModeration } = await import("@/lib/moderation/vision-moderator");
-  const summary = await scanBatchModeration(limit);
-  revalidatePath("/backstage/moderation");
-  return summary;
+  try {
+    return await scanBatchModeration(limit);
+  } finally {
+    revalidatePath("/backstage/moderation");
+  }
 }
 
 export async function adminMarkModerationStatus(
