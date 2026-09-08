@@ -20,6 +20,10 @@ Return ONLY a raw JSON object (no markdown, no code fence) matching this exact s
 }
 Note: "confidence" must be a float between 0.0 and 1.0.`;
 
+function cleanJsonResponse(raw: string): string {
+  return raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+}
+
 async function callVisionApi(mimeType: string, base64Data: string): Promise<ModerationResult> {
   const groqKey = process.env.GROQ_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -60,7 +64,7 @@ async function callVisionApi(mimeType: string, base64Data: string): Promise<Mode
     const data = await res.json();
     const rawContent = data.choices?.[0]?.message?.content;
     if (!rawContent) throw new Error("Empty response from Groq Vision");
-    return JSON.parse(rawContent) as ModerationResult;
+    return JSON.parse(cleanJsonResponse(rawContent)) as ModerationResult;
   }
 
   if (openaiKey) {
@@ -97,7 +101,7 @@ async function callVisionApi(mimeType: string, base64Data: string): Promise<Mode
     const data = await res.json();
     const rawContent = data.choices?.[0]?.message?.content;
     if (!rawContent) throw new Error("Empty response from OpenAI Vision");
-    return JSON.parse(rawContent) as ModerationResult;
+    return JSON.parse(cleanJsonResponse(rawContent)) as ModerationResult;
   }
 
   if (geminiKey) {
@@ -136,7 +140,7 @@ async function callVisionApi(mimeType: string, base64Data: string): Promise<Mode
     const data = await res.json();
     const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!rawText) throw new Error("Empty response from Gemini Vision");
-    return JSON.parse(rawText) as ModerationResult;
+    return JSON.parse(cleanJsonResponse(rawText)) as ModerationResult;
   }
 
   throw new Error("No Vision AI key configured (set GROQ_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY in .env).");
@@ -226,6 +230,7 @@ export async function scanBatchModeration(limit = 10) {
       OR: [
         { moderation: null },
         { moderation: { status: "UNSCANNED" } },
+        { moderation: { status: "ERROR" } },
       ],
     },
     take: limit,
@@ -263,11 +268,12 @@ export async function scanBatchModeration(limit = 10) {
 }
 
 export async function getModerationStats() {
-  const [totalImages, scannedCount, flaggedAdult, flaggedSuggestive] = await Promise.all([
+  const [totalImages, scannedCount, flaggedAdult, flaggedSuggestive, errorCount] = await Promise.all([
     prisma.file.count({ where: { status: "COMMITTED", mimeType: { startsWith: "image/" } } }),
     prisma.fileModeration.count({ where: { status: { in: ["SAFE", "FLAGGED_ADULT", "FLAGGED_SUGGESTIVE"] } } }),
     prisma.fileModeration.count({ where: { status: "FLAGGED_ADULT" } }),
     prisma.fileModeration.count({ where: { status: "FLAGGED_SUGGESTIVE" } }),
+    prisma.fileModeration.count({ where: { status: "ERROR" } }),
   ]);
 
   const pendingCount = Math.max(0, totalImages - scannedCount);
@@ -277,6 +283,7 @@ export async function getModerationStats() {
     scannedCount,
     flaggedAdult,
     flaggedSuggestive,
+    errorCount,
     totalFlagged: flaggedAdult + flaggedSuggestive,
     pendingCount,
   };

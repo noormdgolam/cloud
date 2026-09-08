@@ -93,6 +93,13 @@ export default async function BackstageModerationPage({
         { moderation: { status: "UNSCANNED" } },
       ],
     };
+  } else if (tab === "error") {
+    whereClause = {
+      ...whereClause,
+      moderation: {
+        status: "ERROR",
+      },
+    };
   }
 
   const [filesRaw, matchCount] = await Promise.all([
@@ -160,11 +167,17 @@ export default async function BackstageModerationPage({
       </div>
 
       {/* ── Statistics Summary ── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
         <StatCard icon={Image} label="Total Images" value={stats.totalImages} />
         <StatCard icon={ShieldCheck} label="Scanned" value={stats.scannedCount} variant="success" />
         <StatCard icon={ShieldAlert} label="Adult Flagged" value={stats.flaggedAdult} variant="danger" />
         <StatCard icon={AlertTriangle} label="Suggestive" value={stats.flaggedSuggestive} variant="warning" />
+        <StatCard
+          icon={AlertTriangle}
+          label="Scan Errors"
+          value={stats.errorCount}
+          variant={stats.errorCount > 0 ? "danger" : "default"}
+        />
         <StatCard icon={Sparkles} label="Pending Scan" value={stats.pendingCount} />
       </div>
 
@@ -199,6 +212,16 @@ export default async function BackstageModerationPage({
           }`}
         >
           Suggestive ({stats.flaggedSuggestive})
+        </Link>
+        <Link
+          href="/backstage/moderation?tab=error"
+          className={`rounded-xl px-3 py-1.5 transition-colors ${
+            tab === "error"
+              ? "bg-danger/10 text-danger border border-danger/30"
+              : "text-ink-muted hover:text-ink hover:bg-bg-2"
+          }`}
+        >
+          Errors ({stats.errorCount})
         </Link>
         <Link
           href="/backstage/moderation?tab=unscanned"

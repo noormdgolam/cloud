@@ -154,6 +154,7 @@ export function ModerationClient({
               const isFlagged =
                 file.moderation?.status === "FLAGGED_ADULT" ||
                 file.moderation?.status === "FLAGGED_SUGGESTIVE";
+              const isError = file.moderation?.status === "ERROR";
               const isRevealed = Boolean(revealed[file.id]);
               const isScanning = activeScanId === file.id;
 
@@ -163,6 +164,8 @@ export function ModerationClient({
                   className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border transition-all ${
                     isFlagged
                       ? "border-danger/40 bg-bg-2/80 hover:border-danger"
+                      : isError
+                      ? "border-danger/30 bg-danger/5 hover:border-danger/50"
                       : "border-border bg-bg-2/50 hover:border-border-hover"
                   }`}
                 >
@@ -253,9 +256,17 @@ export function ModerationClient({
                       </div>
 
                       {file.moderation?.reason && (
-                        <p className="mt-1 rounded-lg border border-border/50 bg-bg-3/50 p-2 text-xs text-ink-muted leading-relaxed">
+                        <p
+                          className={`mt-1 rounded-lg border p-2 text-xs leading-relaxed ${
+                            isError
+                              ? "border-danger/30 bg-danger/10 text-danger"
+                              : "border-border/50 bg-bg-3/50 text-ink-muted"
+                          }`}
+                        >
                           <span className="font-semibold text-ink-faint uppercase text-[10px] block">
-                            AI Verdict ({Math.round((file.moderation.confidence ?? 0.8) * 100)}% confidence):
+                            {isError
+                              ? "Scan Failure Details:"
+                              : `AI Verdict (${Math.round((file.moderation.confidence ?? 0.8) * 100)}% confidence):`}
                           </span>
                           {file.moderation.reason}
                         </p>
@@ -270,24 +281,24 @@ export function ModerationClient({
                         disabled={isScanning}
                         onClick={() => handleSingleScan(file.id)}
                         className="gap-1.5 text-xs text-ink-muted hover:text-ink px-2.5 py-1"
-                        title="Re-scan with Vision AI"
+                        title={isError ? "Retry scanning with Vision AI" : "Re-scan with Vision AI"}
                       >
                         {isScanning ? (
                           <Loader2 className="size-3 animate-spin" aria-hidden />
                         ) : (
                           <RotateCw className="size-3" aria-hidden />
                         )}
-                        Scan
+                        {isError ? "Retry" : "Scan"}
                       </Button>
 
                       <div className="flex items-center gap-1.5">
-                        {isFlagged && (
+                        {(isFlagged || isError) && (
                           <Button
                             type="button"
                             variant="ghost"
                             onClick={() => handleMarkSafe(file.id)}
                             className="gap-1 text-xs text-accent-2 hover:bg-accent/10 px-2.5 py-1"
-                            title="Mark as false positive safe"
+                            title="Mark as false positive / safe"
                           >
                             <CheckCircle className="size-3" aria-hidden />
                             Safe
