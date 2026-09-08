@@ -24,10 +24,14 @@ export function ShareDialog({
   const [expiresInDays, setExpiresInDays] = useState<string>("7");
   const [password, setPassword] = useState("");
   const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState(false);
   const loading = open && link === undefined;
 
   useEffect(() => {
-    if (!open || link !== undefined) return;
+    if (!open) {
+      setLink(undefined);
+      return;
+    }
     let cancelled = false;
     getActiveShareLink(fileId).then((result) => {
       if (!cancelled) setLink(result);
@@ -35,7 +39,7 @@ export function ShareDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, fileId, link]);
+  }, [open, fileId]);
 
   const shareUrl = link ? `${window.location.origin}/s/${link.token}` : "";
 
@@ -81,13 +85,19 @@ export function ShareDialog({
             <Button
               type="button"
               variant="ghost"
+              disabled={busy}
               className="w-full border-danger/40 text-danger hover:border-danger"
               onClick={async () => {
-                await revokeShareLink(link.id);
-                setLink(null);
+                setBusy(true);
+                try {
+                  await revokeShareLink(link.id);
+                  setLink(null);
+                } finally {
+                  setBusy(false);
+                }
               }}
             >
-              Revoke link
+              {busy ? "Revoking…" : "Revoke link"}
             </Button>
           </div>
         ) : (
@@ -123,17 +133,23 @@ export function ShareDialog({
             <Button
               type="button"
               variant="accent"
+              disabled={busy}
               className="w-full"
               onClick={async () => {
-                const created = await createShareLink(fileId, {
-                  expiresInDays: expiresInDays === "0" ? null : Number(expiresInDays),
-                  maxDownloads: null,
-                  password: password || null,
-                });
-                setLink(created);
+                setBusy(true);
+                try {
+                  const created = await createShareLink(fileId, {
+                    expiresInDays: expiresInDays === "0" ? null : Number(expiresInDays),
+                    maxDownloads: null,
+                    password: password || null,
+                  });
+                  setLink(created);
+                } finally {
+                  setBusy(false);
+                }
               }}
             >
-              Create link
+              {busy ? "Creating…" : "Create link"}
             </Button>
           </div>
         )}

@@ -56,8 +56,11 @@ export function FileRequestRow({ request }: { request: FileRequestListItem }) {
           disabled={busy}
           onClick={async () => {
             setBusy(true);
-            await revokeFileRequest(request.id);
-            setBusy(false);
+            try {
+              await revokeFileRequest(request.id);
+            } finally {
+              setBusy(false);
+            }
           }}
           title="Close this request"
           className="rounded-lg p-1.5 text-ink-faint hover:bg-[var(--glass-surface-hover)] hover:text-ink disabled:opacity-40"
@@ -86,9 +89,12 @@ export function FileRequestRow({ request }: { request: FileRequestListItem }) {
             className="w-full border-danger/40 text-danger hover:border-danger"
             onClick={async () => {
               setBusy(true);
-              await deleteFileRequest(request.id);
-              setBusy(false);
-              setDeleteOpen(false);
+              try {
+                await deleteFileRequest(request.id);
+                setDeleteOpen(false);
+              } finally {
+                setBusy(false);
+              }
             }}
           >
             Delete request

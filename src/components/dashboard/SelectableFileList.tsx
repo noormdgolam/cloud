@@ -244,10 +244,13 @@ export function SelectableFileList({ files, parentId }: { files: FileSummary[]; 
             className="w-full border-danger/40 text-danger hover:border-danger"
             onClick={async () => {
               setBusy(true);
-              await bulkDeleteFiles(Array.from(selected));
-              setBusy(false);
-              setBulkDeleteOpen(false);
-              exitSelectMode();
+              try {
+                await bulkDeleteFiles(Array.from(selected));
+                setBulkDeleteOpen(false);
+                exitSelectMode();
+              } finally {
+                setBusy(false);
+              }
             }}
           >
             {busy ? "Deleting…" : `Delete ${selected.size} file${selected.size === 1 ? "" : "s"}`}

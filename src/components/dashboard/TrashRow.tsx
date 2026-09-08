@@ -40,8 +40,11 @@ export function TrashRow({
         disabled={busy !== null}
         onClick={async () => {
           setBusy("restore");
-          await restoreFile(id);
-          setBusy(null);
+          try {
+            await restoreFile(id);
+          } finally {
+            setBusy(null);
+          }
         }}
         className="rounded-lg p-1.5 text-ink-faint hover:bg-[var(--glass-surface-hover)] hover:text-ink disabled:opacity-50"
         aria-label={`Restore ${name}`}
@@ -68,9 +71,12 @@ export function TrashRow({
             className="w-full border-danger/40 text-danger hover:border-danger"
             onClick={async () => {
               setBusy("delete");
-              await permanentlyDeleteFile(id);
-              setBusy(null);
-              setDeleteOpen(false);
+              try {
+                await permanentlyDeleteFile(id);
+                setDeleteOpen(false);
+              } finally {
+                setBusy(null);
+              }
             }}
           >
             {busy === "delete" ? "Deleting…" : "Delete forever"}

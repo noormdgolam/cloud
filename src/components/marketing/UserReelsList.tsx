@@ -34,9 +34,12 @@ export function UserReelsList({ reels }: { reels: UserReel[] }) {
               disabled={busyId === reel.id}
               onClick={async () => {
                 setBusyId(reel.id);
-                await unpublishReel(reel.id);
-                setHidden((prev) => new Set(prev).add(reel.id));
-                setBusyId(null);
+                try {
+                  await unpublishReel(reel.id);
+                  setHidden((prev) => new Set(prev).add(reel.id));
+                } finally {
+                  setBusyId(null);
+                }
               }}
               className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-ink-faint hover:bg-[var(--glass-surface-hover)] hover:text-ink disabled:opacity-40"
             >
