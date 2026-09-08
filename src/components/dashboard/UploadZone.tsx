@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UploadCloud } from "lucide-react";
+import { UploadCloud, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { formatBytes } from "@/lib/format";
 import { uploadFile } from "@/lib/client-upload";
@@ -129,12 +129,34 @@ export function UploadZone({
             <div key={task.id} className="glass rounded-xl p-3">
               <div className="mb-1.5 flex items-center justify-between gap-2">
                 <span className="truncate text-xs text-ink">{task.name}</span>
-                <span className="shrink-0 font-mono text-[0.7rem] text-ink-faint">
-                  {formatBytes(task.size)}
-                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="font-mono text-[0.7rem] text-ink-faint">
+                    {formatBytes(task.size)}
+                  </span>
+                  {task.status === "error" && (
+                    <button
+                      type="button"
+                      onClick={() => setTasks((prev) => prev.filter((t) => t.id !== task.id))}
+                      className="rounded p-0.5 text-ink-faint hover:bg-[var(--glass-surface-hover)] hover:text-ink"
+                      aria-label="Dismiss error"
+                      title="Dismiss"
+                    >
+                      <X className="size-3.5" aria-hidden />
+                    </button>
+                  )}
+                </div>
               </div>
               {task.status === "error" ? (
-                <p className="text-xs text-danger">{task.error}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-danger">{task.error}</p>
+                  <button
+                    type="button"
+                    onClick={() => setTasks((prev) => prev.filter((t) => t.id !== task.id))}
+                    className="text-[0.7rem] text-ink-faint hover:text-ink hover:underline shrink-0"
+                  >
+                    Dismiss
+                  </button>
+                </div>
               ) : (
                 <div className="h-1 overflow-hidden rounded-full bg-bg-2">
                   <div
