@@ -8,7 +8,7 @@
 // from the sandbox before going live, since a wrong implementation either
 // rejects every real payment or (worse) accepts a forged one.
 import "server-only";
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -79,7 +79,17 @@ export function verifyIpnSignature(payload: unknown, signatureHeader: string | n
   if (!signatureHeader) return false;
   const secret = requireEnv("NOWPAYMENTS_IPN_SECRET");
   const expected = createHmac("sha512", secret).update(sortedStringify(payload)).digest("hex");
-  return expected === signatureHeader;
+
+  // timingSafeEqual (not ===) — a plain string comparison short-circuits on
+  // the first mismatched byte, leaking how many leading bytes an attacker
+  // guessed correctly via response-time differences, which is enough to
+  // eventually forge a valid signature and fake a "payment finished" IPN.
+  // Requires equal-length buffers, hence the length check first (also
+  // guards a malformed/non-hex header from throwing).
+  const expectedBuf = Buffer.from(expected, "hex");
+  const receivedBuf = Buffer.from(signatureHeader, "hex");
+  if (expectedBuf.length !== receivedBuf.length) return false;
+  return timingSafeEqual(expectedBuf, receivedBuf);
 }
 
 export type NowPaymentsIpnPayload = {

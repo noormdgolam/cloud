@@ -9,8 +9,19 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 // so a provider retrying its webhook can't double-extend a subscription.
 export async function activateSubscription(paymentId: string, providerRef: string) {
   return prisma.$transaction(async (tx) => {
-    const payment = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
-    if (payment.status === "COMPLETED") return payment;
+    // FOR UPDATE (not a plain findUnique) — payment providers commonly retry
+    // a webhook/callback until they get a 200 back, so two deliveries for the
+    // same payment can arrive close together. A plain read here lets both
+    // transactions see status: "PENDING" before either commits, double-
+    // extending the subscription period. Locking the row makes the second
+    // transaction wait for the first to commit, so its own read then
+    // correctly sees COMPLETED and no-ops.
+    const rows = await tx.$queryRaw<{ status: string; planId: string; userId: string }[]>`
+      SELECT status, planId, userId FROM Payment WHERE id = ${paymentId} FOR UPDATE
+    `;
+    const payment = rows[0];
+    if (!payment) throw new Error(`Payment not found: ${paymentId}`);
+    if (payment.status === "COMPLETED") return tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
 
     const plan = await tx.plan.findUniqueOrThrow({ where: { id: payment.planId } });
 

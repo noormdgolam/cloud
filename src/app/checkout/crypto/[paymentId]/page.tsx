@@ -4,6 +4,7 @@ import { Cloud } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { CryptoCheckoutStatus } from "@/components/dashboard/CryptoCheckoutStatus";
 
 export const metadata: Metadata = { title: "Complete payment" };
 
@@ -51,7 +52,16 @@ export default async function CryptoCheckoutPage(
     ? (record as { pack: { name: string } }).pack.name
     : (record as { plan: { name: string } }).plan.name;
 
-  const details = record.rawPayload ? (JSON.parse(record.rawPayload) as { pay_address?: string; pay_amount?: number }) : null;
+  let details: { pay_address?: string; pay_amount?: number } | null = null;
+  if (record.rawPayload) {
+    try {
+      details = JSON.parse(record.rawPayload);
+    } catch {
+      // Malformed/truncated rawPayload shouldn't 500 the whole page — fall
+      // through to the "couldn't load" state below like a missing payload.
+      details = null;
+    }
+  }
   if (!details?.pay_address) return unavailable("Couldn't load payment details. Try starting checkout again.");
 
   return (
@@ -59,7 +69,7 @@ export default async function CryptoCheckoutPage(
       <GlassCard className="flex flex-col gap-4 p-7 sm:p-8">
         <div>
           <h1 className="text-lg font-semibold text-ink">Send USDT (TRC20)</h1>
-          <p className="mt-1 text-sm text-ink-muted">{label} — this page updates automatically once payment is detected.</p>
+          <p className="mt-1 text-sm text-ink-muted">{label}</p>
         </div>
 
         <div className="rounded-xl border border-border bg-bg-2 p-4">
@@ -75,6 +85,8 @@ export default async function CryptoCheckoutPage(
         <p className="text-xs text-ink-faint">
           Sending on any network other than TRC20, or a different amount, may result in lost funds.
         </p>
+
+        <CryptoCheckoutStatus paymentId={paymentId} isAddon={isAddon} />
       </GlassCard>
     </Shell>
   );
