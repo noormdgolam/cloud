@@ -49,8 +49,11 @@ export async function createShareLink(
   options: { expiresInDays: number | null; maxDownloads: number | null; password: string | null }
 ) {
   const identity = await requireIdentity();
-  const file = await prisma.file.findUnique({ where: { id: fileId } });
+  const file = await prisma.file.findUnique({ where: { id: fileId }, include: { moderation: true } });
   if (!file || !ownsFile(file, identity)) throw new Error("Not found.");
+  if (file.moderation?.status === "FLAGGED_ADULT") {
+    throw new Error("This file was flagged by automated moderation and cannot be shared.");
+  }
 
   const token = randomBytes(18).toString("base64url");
   const expiresAt = options.expiresInDays

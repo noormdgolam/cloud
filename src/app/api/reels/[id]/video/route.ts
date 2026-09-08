@@ -25,9 +25,17 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/reels/[i
   }
 
   const { id } = await ctx.params;
-  const reel = await prisma.reel.findUnique({ where: { id }, include: { file: true } });
+  const reel = await prisma.reel.findUnique({
+    where: { id },
+    include: { file: { include: { moderation: true } } },
+  });
 
-  if (!reel || !reel.published || reel.file.status !== "COMMITTED") {
+  if (
+    !reel ||
+    !reel.published ||
+    reel.file.status !== "COMMITTED" ||
+    reel.file.moderation?.status === "FLAGGED_ADULT"
+  ) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 

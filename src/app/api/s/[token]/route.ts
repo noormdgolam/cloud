@@ -30,7 +30,10 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/s/[token
 
   const { token } = await ctx.params;
 
-  const link = await prisma.shareLink.findUnique({ where: { token }, include: { file: true } });
+  const link = await prisma.shareLink.findUnique({
+    where: { token },
+    include: { file: { include: { moderation: true } } },
+  });
 
   if (!link || link.revoked) {
     return NextResponse.json({ error: "This link is no longer available." }, { status: 404 });
@@ -47,6 +50,12 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/s/[token
   if (link.file.scanStatus === "INFECTED") {
     return NextResponse.json(
       { error: "This file was flagged as malicious by a virus scan and can't be downloaded." },
+      { status: 403 }
+    );
+  }
+  if (link.file.moderation?.status === "FLAGGED_ADULT") {
+    return NextResponse.json(
+      { error: "This file was flagged by automated moderation and cannot be shared publicly." },
       { status: 403 }
     );
   }

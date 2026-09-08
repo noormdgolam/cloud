@@ -13,7 +13,16 @@ const FEED_PAGE_SIZE = 10;
 
 export async function getReelsFeed(cursor?: string): Promise<{ items: ReelFeedItem[]; nextCursor: string | null }> {
   const reels = await prisma.reel.findMany({
-    where: { published: true, file: { status: "COMMITTED" } },
+    where: {
+      published: true,
+      file: {
+        status: "COMMITTED",
+        OR: [
+          { moderation: null },
+          { moderation: { status: { not: "FLAGGED_ADULT" } } },
+        ],
+      },
+    },
     orderBy: { createdAt: "desc" },
     take: FEED_PAGE_SIZE + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),

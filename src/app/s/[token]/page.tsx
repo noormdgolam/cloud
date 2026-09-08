@@ -39,7 +39,14 @@ export default async function SharePage(props: PageProps<"/s/[token]">) {
   const { token } = await props.params;
   const link = await prisma.shareLink.findUnique({
     where: { token },
-    include: { file: { include: { user: { select: { creatorProgramEnabled: true } } } } },
+    include: {
+      file: {
+        include: {
+          user: { select: { creatorProgramEnabled: true } },
+          moderation: true,
+        },
+      },
+    },
   });
 
   const unavailable = (message: string) => (
@@ -58,6 +65,9 @@ export default async function SharePage(props: PageProps<"/s/[token]">) {
   if (link.file.status !== "COMMITTED") return unavailable("File not available.");
   if (link.file.scanStatus === "INFECTED") {
     return unavailable("This file was flagged as malicious by a virus scan and can't be shared.");
+  }
+  if (link.file.moderation?.status === "FLAGGED_ADULT") {
+    return unavailable("This file was flagged for containing adult content and cannot be shared publicly.");
   }
 
   // Counts toward the creator-earnings program — a real page load where an
