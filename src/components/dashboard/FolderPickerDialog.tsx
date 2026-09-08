@@ -48,7 +48,10 @@ export function FolderPickerDialog({
   const loading = open && folders === undefined;
 
   useEffect(() => {
-    if (!open || folders !== undefined) return;
+    if (!open) {
+      setFolders(undefined);
+      return;
+    }
     let cancelled = false;
     const fetcher = folderIdForMove ? listUserFoldersForMove(folderIdForMove) : listUserFolders();
     fetcher.then((result) => {
@@ -57,15 +60,18 @@ export function FolderPickerDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, folders, folderIdForMove]);
+  }, [open, folderIdForMove]);
 
   const byId = new Map((folders ?? []).map((f) => [f.id, f]));
 
   async function handlePick(targetFolderId: string | null, folderName?: string) {
     setMoving(true);
-    await onSelect(targetFolderId, folderName);
-    setMoving(false);
-    onOpenChange(false);
+    try {
+      await onSelect(targetFolderId, folderName);
+      onOpenChange(false);
+    } finally {
+      setMoving(false);
+    }
   }
 
   return (
