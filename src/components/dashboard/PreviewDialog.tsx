@@ -1,6 +1,6 @@
 "use client";
 
-import { Download } from "lucide-react";
+import { Download, FileQuestion } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { LinkButton } from "@/components/ui/Button";
 import { previewKind } from "@/lib/mime-preview";
@@ -44,8 +44,20 @@ export function PreviewDialog({
             <TextPreview url={inlineUrl} />
           ) : kind === "docx" || kind === "xlsx" ? (
             <OfficePreview url={inlineUrl} kind={kind} />
+          ) : kind === "pdf" ? (
+            <iframe src={inlineUrl} title={fileName} className="h-full w-full rounded-xl border-0" />
           ) : (
-            <iframe src={inlineUrl} title={fileName} className="h-[65vh] w-full rounded-xl" />
+            <div className="flex flex-col items-center gap-3 p-8 text-center">
+              <div className="flex size-14 items-center justify-center rounded-2xl border border-border bg-bg-1 text-ink-faint">
+                <FileQuestion className="size-7" aria-hidden />
+              </div>
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-medium text-ink">No preview available</p>
+                <p className="text-xs text-ink-faint">
+                  This file type cannot be previewed directly in the browser.
+                </p>
+              </div>
+            </div>
           )}
         </div>
         <LinkButton
