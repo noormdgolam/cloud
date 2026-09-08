@@ -269,11 +269,36 @@ export async function scanBatchModeration(limit = 10) {
 
 export async function getModerationStats() {
   const [totalImages, scannedCount, flaggedAdult, flaggedSuggestive, errorCount] = await Promise.all([
-    prisma.file.count({ where: { status: "COMMITTED", mimeType: { startsWith: "image/" } } }),
-    prisma.fileModeration.count({ where: { status: { in: ["SAFE", "FLAGGED_ADULT", "FLAGGED_SUGGESTIVE"] } } }),
-    prisma.fileModeration.count({ where: { status: "FLAGGED_ADULT" } }),
-    prisma.fileModeration.count({ where: { status: "FLAGGED_SUGGESTIVE" } }),
-    prisma.fileModeration.count({ where: { status: "ERROR" } }),
+    prisma.file.count({
+      where: {
+        status: "COMMITTED",
+        mimeType: { startsWith: "image/" },
+      },
+    }),
+    prisma.fileModeration.count({
+      where: {
+        status: { in: ["SAFE", "FLAGGED_ADULT", "FLAGGED_SUGGESTIVE"] },
+        file: { status: "COMMITTED" },
+      },
+    }),
+    prisma.fileModeration.count({
+      where: {
+        status: "FLAGGED_ADULT",
+        file: { status: "COMMITTED" },
+      },
+    }),
+    prisma.fileModeration.count({
+      where: {
+        status: "FLAGGED_SUGGESTIVE",
+        file: { status: "COMMITTED" },
+      },
+    }),
+    prisma.fileModeration.count({
+      where: {
+        status: "ERROR",
+        file: { status: "COMMITTED" },
+      },
+    }),
   ]);
 
   const pendingCount = Math.max(0, totalImages - scannedCount);
