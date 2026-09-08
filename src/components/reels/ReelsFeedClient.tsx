@@ -65,9 +65,17 @@ export function ReelsFeedClient({ initialItems, initialCursor }: { initialItems:
     setLoading(true);
     try {
       const res = await fetch(`/api/reels/feed?cursor=${encodeURIComponent(cursor)}`);
+      if (!res.ok) return;
       const data = await res.json();
-      setItems((prev) => [...prev, ...data.items]);
-      setCursor(data.nextCursor);
+      if (!data || !Array.isArray(data.items)) return;
+      setItems((prev) => {
+        const existingIds = new Set(prev.map((i) => i.id));
+        const newItems = (data.items as FeedItem[]).filter((i) => !existingIds.has(i.id));
+        return [...prev, ...newItems];
+      });
+      setCursor(data.nextCursor ?? null);
+    } catch {
+      // ignore fetch or parse errors
     } finally {
       setLoading(false);
     }
