@@ -24,84 +24,82 @@ function cleanJsonResponse(raw: string): string {
   return raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
 }
 
+async function callOpenAiCompatibleVision({
+  endpoint,
+  apiKey,
+  model,
+  providerName,
+  mimeType,
+  base64Data,
+}: {
+  endpoint: string;
+  apiKey: string;
+  model: string;
+  providerName: string;
+  mimeType: string;
+  base64Data: string;
+}): Promise<ModerationResult> {
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Classify this image for content moderation." },
+            {
+              type: "image_url",
+              image_url: { url: `data:${mimeType};base64,${base64Data}` },
+            },
+          ],
+        },
+      ],
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`${providerName} Vision API failed (${res.status}): ${await res.text()}`);
+  }
+
+  const data = await res.json();
+  const rawContent = data.choices?.[0]?.message?.content;
+  if (!rawContent) throw new Error(`Empty response from ${providerName} Vision`);
+  return JSON.parse(cleanJsonResponse(rawContent)) as ModerationResult;
+}
+
 async function callVisionApi(mimeType: string, base64Data: string): Promise<ModerationResult> {
   const groqKey = process.env.GROQ_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
 
   if (groqKey) {
-    const model = process.env.GROQ_VISION_MODEL || "llama-3.2-11b-vision-preview";
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${groqKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Classify this image for content moderation." },
-              {
-                type: "image_url",
-                image_url: { url: `data:${mimeType};base64,${base64Data}` },
-              },
-            ],
-          },
-        ],
-        temperature: 0.1,
-        response_format: { type: "json_object" },
-      }),
+    return callOpenAiCompatibleVision({
+      endpoint: "https://api.groq.com/openai/v1/chat/completions",
+      apiKey: groqKey,
+      model: process.env.GROQ_VISION_MODEL || "llama-3.2-11b-vision-preview",
+      providerName: "Groq",
+      mimeType,
+      base64Data,
     });
-
-    if (!res.ok) {
-      throw new Error(`Groq Vision API failed (${res.status}): ${await res.text()}`);
-    }
-
-    const data = await res.json();
-    const rawContent = data.choices?.[0]?.message?.content;
-    if (!rawContent) throw new Error("Empty response from Groq Vision");
-    return JSON.parse(cleanJsonResponse(rawContent)) as ModerationResult;
   }
 
   if (openaiKey) {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${openaiKey}`,
-      },
-      body: JSON.stringify({
-        model: process.env.OPENAI_VISION_MODEL || "gpt-4o-mini",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Classify this image for content moderation." },
-              {
-                type: "image_url",
-                image_url: { url: `data:${mimeType};base64,${base64Data}` },
-              },
-            ],
-          },
-        ],
-        temperature: 0.1,
-        response_format: { type: "json_object" },
-      }),
+    return callOpenAiCompatibleVision({
+      endpoint: "https://api.openai.com/v1/chat/completions",
+      apiKey: openaiKey,
+      model: process.env.OPENAI_VISION_MODEL || "gpt-4o-mini",
+      providerName: "OpenAI",
+      mimeType,
+      base64Data,
     });
-
-    if (!res.ok) {
-      throw new Error(`OpenAI Vision API failed (${res.status}): ${await res.text()}`);
-    }
-
-    const data = await res.json();
-    const rawContent = data.choices?.[0]?.message?.content;
-    if (!rawContent) throw new Error("Empty response from OpenAI Vision");
-    return JSON.parse(cleanJsonResponse(rawContent)) as ModerationResult;
   }
 
   if (geminiKey) {
