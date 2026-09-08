@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Wand2, Play, Square, Download, CheckCircle2 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
@@ -119,6 +120,7 @@ function AudioEnhanceContent({
   fileName: string;
   folderId: string | null;
 }) {
+  const router = useRouter();
   const [stage, setStage] = useState<Stage>("loading");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -208,6 +210,7 @@ function AudioEnhanceContent({
       const baseName = fileName.replace(/\.[^.]+$/, "");
       const newName = `${baseName} (enhanced).wav`;
       await uploadFile(new File([blob], newName, { type: "audio/wav" }), folderId, () => {});
+      router.refresh();
       setSaved(true);
     } catch {
       setErrorMsg("Couldn't save the enhanced audio.");

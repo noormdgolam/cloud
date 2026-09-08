@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -31,6 +32,7 @@ export function PdfToolDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const router = useRouter();
   const [pageCount, setPageCount] = useState<number | null>(null);
   const [pageRanges, setPageRanges] = useState("");
   const [watermarkText, setWatermarkText] = useState("CONFIDENTIAL");
@@ -86,6 +88,7 @@ export function PdfToolDialog({
 
       const file = new File([new Uint8Array(outBytes)], outName, { type: "application/pdf" });
       await uploadFile(file, folderId, () => {});
+      router.refresh();
       onOpenChange(false);
     } catch {
       setError("Couldn't process this PDF. Try again.");

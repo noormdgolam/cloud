@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Music, X } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
@@ -35,6 +36,7 @@ export function ReelsGeneratorDialog({
   onOpenChange: (open: boolean) => void;
   onDone: () => void;
 }) {
+  const router = useRouter();
   const [slides, setSlides] = useState<SlideInput[] | null>(null);
   const [musicTrack, setMusicTrack] = useState<PickerFile | null>(null);
   const [musicPickerOpen, setMusicPickerOpen] = useState(false);
@@ -83,6 +85,7 @@ export function ReelsGeneratorDialog({
       setUploading(true);
       const file = new File([blob], "My reel.webm", { type: blob.type || "video/webm" });
       await uploadFile(file, folderId, () => {});
+      router.refresh();
       setDone(true);
       onDone();
     } catch {

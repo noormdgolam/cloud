@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { uploadFile } from "@/lib/client-upload";
@@ -25,6 +26,7 @@ function VideoToAudioContent({
   folderId: string | null;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
   const [saving, setSaving] = useState<Format | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +55,7 @@ function VideoToAudioContent({
       const blob = format === "mp3" ? audioBufferToMp3(buffer) : audioBufferToWav(buffer);
       const outName = `${fileName.replace(/\.[^.]+$/, "")}.${format}`;
       await uploadFile(new File([blob], outName, { type: blob.type }), folderId, () => {});
+      router.refresh();
       onClose();
     } catch {
       setError(`Couldn't save the ${format.toUpperCase()}.`);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -20,6 +21,7 @@ export function MergePdfsDialog({
   onOpenChange: (open: boolean) => void;
   onDone: () => void;
 }) {
+  const router = useRouter();
   const [name, setName] = useState("Merged");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +36,7 @@ export function MergePdfsDialog({
       const merged = await mergePdfs(buffers);
       const file = new File([new Uint8Array(merged)], `${name || "Merged"}.pdf`, { type: "application/pdf" });
       await uploadFile(file, folderId, () => {});
+      router.refresh();
       onOpenChange(false);
       onDone();
     } catch {

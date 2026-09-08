@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { uploadFile } from "@/lib/client-upload";
@@ -25,6 +26,7 @@ export function VideoTrimDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const router = useRouter();
   const [duration, setDuration] = useState<number | null>(null);
   const [start, setStart] = useState(0);
   const [end, setEnd] = useState(0);
@@ -59,6 +61,7 @@ export function VideoTrimDialog({
       const blob = await trimVideo(video, start, end, setProgress);
       const trimmedName = `${fileName.replace(/\.[^.]+$/, "")} (trimmed).webm`;
       await uploadFile(new File([blob], trimmedName, { type: blob.type || "video/webm" }), folderId, () => {});
+      router.refresh();
       onOpenChange(false);
     } catch {
       setError("Couldn't trim this video. Try a shorter range or a different browser.");

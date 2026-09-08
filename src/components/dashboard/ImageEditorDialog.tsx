@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Crop as CropIcon,
   Download,
@@ -142,6 +143,7 @@ export function ImageEditorDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const router = useRouter();
   const [step, setStep] = useState<Step>("crop");
   const [source, setSource] = useState<HTMLImageElement | null>(null);
   const [rotation, setRotation] = useState(0);
@@ -340,6 +342,7 @@ export function ImageEditorDialog({
       const editedName = `${fileName.replace(/\.[^.]+$/, "")} (edited).${format}`;
       const file = new File([blob], editedName, { type: formatInfo.mime });
       await uploadFile(file, folderId, () => {});
+      router.refresh();
       onOpenChange(false);
     } catch {
       setError("Couldn't save the edited image. Try again.");

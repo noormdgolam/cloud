@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Check, FileText, X } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
@@ -57,6 +58,7 @@ export function ScanDocumentDialog({
   onOpenChange: (open: boolean) => void;
   onDone: () => void;
 }) {
+  const router = useRouter();
   const [pageIndex, setPageIndex] = useState(0);
   const [source, setSource] = useState<HTMLImageElement | null>(null);
   const [loadedFileId, setLoadedFileId] = useState<string | null>(null);
@@ -153,6 +155,7 @@ export function ScanDocumentDialog({
       const pdfBytes = await imagesToPdf(completed.map((p) => ({ canvas: p.canvas, mime: "image/jpeg" })));
       const file = new File([new Uint8Array(pdfBytes)], "Scanned document.pdf", { type: "application/pdf" });
       await uploadFile(file, folderId, () => {});
+      router.refresh();
       onOpenChange(false);
       onDone();
     } catch {

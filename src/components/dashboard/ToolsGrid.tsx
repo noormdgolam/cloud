@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Wand2,
   ShieldOff,
@@ -94,6 +95,7 @@ const TOOLS: {
 const CATEGORIES: Category[] = ["Images", "Audio & Video", "PDF & Documents"];
 
 export function ToolsGrid() {
+  const router = useRouter();
   const [activeTool, setActiveTool] = useState<ToolKind | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -171,6 +173,7 @@ export function ToolsGrid() {
       const blob = await stripImageMetadata(`/api/files/${file.id}/download?inline=1`, file.mimeType);
       const cleanedName = `${file.name.replace(/\.[^.]+$/, "")} (no metadata)${file.name.match(/\.[^.]+$/)?.[0] ?? ""}`;
       await uploadFile(new File([blob], cleanedName, { type: blob.type }), file.folderId, () => {});
+      router.refresh();
       setInlineSuccess(`Saved "${cleanedName}" without metadata.`);
     } catch {
       setInlineError(`Couldn't remove metadata from ${file.name}.`);
@@ -186,6 +189,7 @@ export function ToolsGrid() {
       const blob = await optimizeSvg(`/api/files/${file.id}/download`);
       const optimizedName = `${file.name.replace(/\.svg$/i, "")} (optimized).svg`;
       await uploadFile(new File([blob], optimizedName, { type: "image/svg+xml" }), file.folderId, () => {});
+      router.refresh();
       setInlineSuccess(`Saved "${optimizedName}".`);
     } catch {
       setInlineError(`Couldn't optimize ${file.name}.`);
@@ -200,6 +204,7 @@ export function ToolsGrid() {
     setConvertError(null);
     try {
       await convertFile(convertTarget.id, toExt);
+      router.refresh();
       setInlineSuccess(`Converted "${convertTarget.name}" to ${toExt.toUpperCase()}.`);
       setConvertTarget(null);
     } catch {

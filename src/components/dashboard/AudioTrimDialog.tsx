@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Play, Square } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
@@ -28,6 +29,7 @@ export function AudioTrimDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const router = useRouter();
   const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
   const [peaks, setPeaks] = useState<{ min: number; max: number }[]>([]);
   const [start, setStart] = useState(0);
@@ -99,6 +101,7 @@ export function AudioTrimDialog({
       const blob = audioBufferToWav(trimmed);
       const trimmedName = `${fileName.replace(/\.[^.]+$/, "")} (trimmed).wav`;
       await uploadFile(new File([blob], trimmedName, { type: "audio/wav" }), folderId, () => {});
+      router.refresh();
       onOpenChange(false);
     } catch {
       setError("Couldn't save the trimmed audio.");
